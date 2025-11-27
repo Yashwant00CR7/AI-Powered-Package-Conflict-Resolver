@@ -100,6 +100,21 @@ To ensure your agent's memory (sessions) survives restarts on platforms like **H
       ```
     - The app will automatically detect this and switch from local SQLite to your cloud database.
 
+### 🧠 Long-Term Memory (Pinecone)
+
+To enable persistent memory search (so the agent remembers past conversations after restart):
+
+1.  **Get a Free Pinecone API Key**: Sign up at [Pinecone.io](https://www.pinecone.io).
+2.  **Create an Index** (Optional - code does it automatically):
+    - Name: `adk-memory`
+    - Dimensions: `384`
+    - Metric: `cosine`
+3.  **Set Environment Variable**:
+    ```env
+    PINECONE_API_KEY=your_pinecone_api_key
+    ```
+    The agent will automatically switch to `PineconeMemoryService`.
+
 ## 📝 License
 
 MIT License - feel free to use in your own projects!

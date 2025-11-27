@@ -6,4 +6,5 @@ nest_asyncio
 python-dotenv
 certifi
 litellm
-
+pinecone-client
+sentence-transformers

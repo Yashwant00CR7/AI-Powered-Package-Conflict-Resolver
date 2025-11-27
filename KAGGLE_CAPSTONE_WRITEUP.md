@@ -5,7 +5,7 @@
 
 ## Problem Statement
 
-Every developer who has worked with legacy codebases knows the pain: you inherit a project from years ago, run `pip install -r requirements.txt`, and suddenly you're drowning in cryptic error messages about version conflicts, deprecated APIs, and incompatible dependencies. What should take minutes to set up turns into hours—or even days—of debugging.
+Every developer who has worked with legacy codebases knows the pain: you inherit a project from years ago, run `pip install -r requirements.txt`, and suddenly you're drowning in cryptic error messages about version conflicts, deprecated APIs, and incompatible dependencies. What should take minutes to set up turns into hours or even days of debugging.
 
 The problem is deceptively complex:
 - **Version incompatibility**: Package A requires numpy<1.20, but Package B needs numpy>=1.21
@@ -80,17 +80,23 @@ User Input (Error + Packages)
 │  1. Query Creator Agent  │  ← Diagnoses issue, generates search queries
 └──────────────────────────┘
         ↓
-┌──────────────────────────┐
-│  2. Researcher Agent     │  ← Executes Google Search, finds URLs
-└──────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  2. Parallel Research Team (ParallelAgent)             │
+│  ┌──────────────────────┐    ┌──────────────────────┐  │
+│  │ Docs Search Agent    │    │ Community Search     │  │
+│  └──────────────────────┘    └──────────────────────┘  │
+└────────────────────────────────────────────────────────┘
         ↓
 ┌──────────────────────────┐
-│  3. Web Crawler Agent    │  ← Crawls docs, extracts version info
+│  3. Web Crawler Agent    │  ← Custom Agent (Batch + Adaptive Fallback)
 └──────────────────────────┘
         ↓
-┌──────────────────────────┐
-│  4. Code Surgeon Agent   │  ← Analyzes findings, generates fix
-└──────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  4. Code Surgeon Team (LoopAgent)                      │
+│  ┌──────────────┐   ┌──────────────┐   ┌────────────┐  │
+│  │ Code Surgeon │ → │ Verification │ → │ Stop Check │  │
+│  └──────────────┘   └──────────────┘   └────────────┘  │
+└────────────────────────────────────────────────────────┘
         ↓
 Output (Fixed requirements.txt + Explanation)
 ```
@@ -98,33 +104,32 @@ Output (Fixed requirements.txt + Explanation)
 ### **Agent Breakdown**
 
 **1. Query Creator Agent (Dependency Detective)**
-- **Model**: Gemini 2.5 Pro
-- **Tools**: Google Search, Context Memory
-- **Role**: Analyzes the error log and package versions, identifies the root cause (e.g., "numpy.float deprecated in NumPy 1.24"), and generates targeted search queries like:
-  - `"numpy.float deprecated version migration guide"`
-  - `"tensorflow 2.x keras compatibility matrix"`
+- **Model**: Gemini 2.0 Flash Lite
+- **Tools**: Google Search, Context Memory (Save/Load)
+- **Role**: Analyzes the error log, extracts package names, saves them to persistent memory, and generates targeted search queries.
 
-**2. Researcher Agent (Technical Resource Curator)**
-- **Model**: Gemini 2.5 Pro
-- **Tools**: Google Search
-- **Role**: Executes the generated queries, filters results by credibility (prioritizing official docs, GitHub, Stack Overflow), and returns the top 7 most relevant URLs.
+**2. Parallel Research Team (ParallelAgent)**
+- **Docs Search Agent**: Scours official documentation (*.org, *.io).
+- **Community Search Agent**: Checks StackOverflow and GitHub Issues.
+- **Role**: Runs concurrently to gather diverse perspectives (official vs. community) in half the time.
 
 **3. Web Crawler Agent (Content Extractor)**
 - **Model**: Grok (via OpenRouter)
 - **Tools**: Batch Crawl (Crawl4AI), Adaptive Crawl
-- **Role**: Crawls the URLs, extracts structured information (version requirements, breaking changes, migration steps), and summarizes findings.
+- **Role**: Custom Agent that deterministically attempts fast batch crawling first, automatically falling back to adaptive crawling if data is insufficient.
 
-**4. Code Surgeon Agent**
+**4. Code Surgeon Team (LoopAgent)**
 - **Model**: Grok (via OpenRouter)
-- **Tools**: Context Memory
-- **Role**: Synthesizes all research, determines compatible package versions, generates a fixed `requirements.txt`, and provides a migration guide.
+- **Tools**: Context Memory, Validation Tool
+- **Role**: A self-correcting loop where the Code Surgeon generates a fix, the Verification Agent checks it for syntax/conflicts, and the loop continues until the solution is verified.
 
 ### **Key Design Decisions**
 
 - **Sequential Flow**: Each agent builds on the previous agent's output, creating a knowledge pipeline.
-- **Dual-Model Strategy**: Gemini for reasoning-heavy tasks (diagnosis, query generation), Grok for extraction-heavy tasks (web crawling).
-- **Session Memory**: SQLite + async I/O for persistent session state across runs.
-- **Context Sharing**: Agents use a shared context store to pass package names, versions, and findings between steps.
+- **Parallel Execution**: Research is split into "Official" and "Community" streams to maximize coverage and speed.
+- **Self-Correction**: The Code Surgeon operates in a loop, fixing its own mistakes based on feedback from the Verification Agent.
+- **Dual-Model Strategy**: Gemini 2.0 Flash Lite for fast reasoning/search, Grok for heavy context processing.
+- **Hybrid Memory**: SQLite for session logs + Pinecone Vector DB for long-term semantic recall.
 
 ---
 
@@ -148,6 +153,7 @@ Output (Fixed requirements.txt + Explanation)
 - **Google Search API** - Real-time documentation discovery
 
 ### **Infrastructure**
+- **Pinecone** - Vector database for long-term memory
 - **SQLite + aiosqlite** - Async session persistence
 - **nest_asyncio** - Event loop management for both CLI and web interfaces
 - **Python 3.8+** - Core programming language
@@ -160,7 +166,8 @@ Output (Fixed requirements.txt + Explanation)
 5. **Deployment**: Created both CLI (`main.py`) and web interface (`web_app.py`)
 
 ### **Challenges Solved**
-- **Model Limitations**: Initially used Gemini 2.0 Flash Lite, but hit function-calling limits. Upgraded to Gemini 2.5 Pro for better tool use.
+- **Model Limitations**: Switched to `Gemini 2.0 Flash Lite` for speed and `Grok` for large context handling.
+- **Hallucination Control**: Implemented a `Verification Agent` loop to catch and fix invalid `requirements.txt` syntax before showing it to the user.
 - **SSL Errors**: Disabled SSL verification in Crawl4AI for compatibility with certain documentation sites.
 - **Session Management**: Implemented proper async session creation to avoid "Session not found" errors.
 
@@ -219,10 +226,6 @@ This is just the beginning. Imagine a world where every developer has an AI assi
 
 **The future of software development is agentic. This project is a step toward that future.**
 
----
-
-**Word Count**: ~1,485 words
-
-**GitHub**: [your-repo-link]  
+**GitHub**: [https://github.com/Yashwant00CR7/AI-Powered-Package-Conflict-Resolver]
 **Live Demo**: [your-demo-link]  
 **Built with**: Google ADK, Gemini 2.5 Pro, Crawl4AI

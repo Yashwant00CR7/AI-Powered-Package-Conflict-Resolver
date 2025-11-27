@@ -69,7 +69,21 @@ def get_session_service(db_url=None):
 from google.adk.memory import InMemoryMemoryService
 
 def get_memory_service():
-    """Returns a configured InMemoryMemoryService instance."""
+    """
+    Returns a configured MemoryService instance.
+    Uses Pinecone if PINECONE_API_KEY is set, otherwise InMemory.
+    """
+    pinecone_key = os.getenv("PINECONE_API_KEY")
+    
+    if pinecone_key:
+        try:
+            from .memory import PineconeMemoryService
+            memory_service = PineconeMemoryService(api_key=pinecone_key)
+            logger.info("✅ Memory service initialized: Pinecone (Long-Term Vector Store)")
+            return memory_service
+        except Exception as e:
+            logger.error(f"❌ Failed to init Pinecone, falling back to InMemory: {e}")
+            
     memory_service = InMemoryMemoryService()
-    logger.info("✅ Memory service initialized: InMemory")
+    logger.info("✅ Memory service initialized: InMemory (Ephemeral)")
     return memory_service
