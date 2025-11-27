@@ -19,11 +19,12 @@ def create_query_creator_agent():
     agent = Agent(
         name="Query_Creator_Agent",
         model=get_gemini_model(),
-        tools=[google_search, save_context_tool], # Added save_context_tool
+        tools=[google_search, save_context_tool, load_memory], # Added load_memory
         description="Dependency Detective specialized in diagnosing Python environment conflicts",
         instruction="""
         You are the "Dependency Detective," an expert AI agent specialized in diagnosing Python environment conflicts, legacy code rot, and version mismatch errors.
         Use Google Search Tool if You don't Know about those issue or packages.
+        Use `load_memory` to recall details from previous conversations if the user refers to "last time" or "previous error".
 
         YOUR GOAL:
         1. Analyze the input to identify the specific packages involved (e.g., "tensorflow", "numpy").

@@ -87,6 +87,19 @@ The crawler has SSL verification disabled by default. If issues persist, check y
 ### Database locked errors
 Ensure only one instance of the application is running at a time.
 
+## ☁️ Deployment & Persistence
+
+To ensure your agent's memory (sessions) survives restarts on platforms like **Hugging Face Spaces** or **Google Cloud Run**, you must use an external database.
+
+1.  **Get a Free PostgreSQL Database**: Use a provider like [Neon.tech](https://neon.tech), [Supabase](https://supabase.com), or [CockroachDB](https://www.cockroachlabs.com).
+2.  **Get the Connection String**: It looks like `postgresql://user:password@host/dbname`.
+3.  **Set Environment Variable**:
+    - In your deployment settings (Secrets/Variables), add:
+      ```env
+      DATABASE_URL=postgresql://user:password@host/dbname
+      ```
+    - The app will automatically detect this and switch from local SQLite to your cloud database.
+
 ## 📝 License
 
 MIT License - feel free to use in your own projects!

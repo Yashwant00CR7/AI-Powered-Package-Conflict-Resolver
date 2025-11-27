@@ -47,15 +47,20 @@ def get_gemini_model():
 
 # ===== SESSION SERVICE INITIALIZATION =====
 # Using DatabaseSessionService with SQLite + AsyncIO driver
-def get_session_service(db_url="sqlite+aiosqlite:///package_conflict_resolver.db"):
+def get_session_service(db_url=None):
     """
     Returns a configured DatabaseSessionService instance.
     
     Args:
-        db_url: Database connection string (default: SQLite with aiosqlite driver)
+        db_url: Database connection string. 
+                Defaults to DATABASE_URL env var, or local SQLite if not set.
     """
+    # Prioritize argument, then env var, then local default
+    if not db_url:
+        db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///package_conflict_resolver.db")
+        
     session_service = DatabaseSessionService(db_url=db_url)
-    logger.info(f"✅ Session service initialized: {db_url}")
+    logger.info(f"✅ Session service initialized: {db_url.split('://')[0]}://...") # Log safe URL
     return session_service
 
 
