@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment Variables
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright browsers cache (optional - can be removed if needed)
+# ms-playwright/
+
+# Crawl4AI cache
+.crawl4ai/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Development/Debug files
+verify_*.py
+debug_*.py
+inspect_*.py
+test_*.py
+PROJECT_RENAME_SUMMARY.md
+
+# Old database files
+legacy_solver.db
