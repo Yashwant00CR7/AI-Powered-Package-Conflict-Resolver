@@ -67,7 +67,7 @@ python main.py
 
 **Option B: Web UI (Full Experience)**
 ```bash
-python web_app.py
+adk web --no-reload
 ```
 Open [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) to interact with the agent visually and view chat history.
 
