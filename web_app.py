@@ -1,32 +1,29 @@
 """
-Web Interface Entry Point for ADK Web UI.
-Run with: adk web web_app.py --no-reload
+Inspection script for Runner source.
 """
 import nest_asyncio
 from google.adk import Runner
-from src.config import get_session_service
-from src.agents import create_root_agent
-from src.utils import logger
+import inspect
 
-# Apply nest_asyncio to handle event loop conflicts in the web server
 nest_asyncio.apply()
 
-logger.info("🌐 Initializing Web Interface...")
+print("Source of Runner.__init__:")
+try:
+    print(inspect.getsource(Runner.__init__))
+except Exception as e:
+    print(f"Error getting source: {e}")
 
-# Initialize Session Service
-# We use the same SQLite database as the CLI
-session_service = get_session_service()
-
-# Initialize the Root Agent
-# This is the agent that will process the web queries
-agent = create_root_agent()
-
-# Initialize Runner
-# The ADK Web UI looks for a 'runner' or 'agent' instance
-runner = Runner(
-    agent=agent,
-    app_name="package_conflict_resolver_web",
-    session_service=session_service
-)
-
-logger.info("✅ Web Interface Ready. Run 'adk web web_app.py --no-reload' to start.")
+print("\nSource of Runner properties:")
+# Check if app is a property or attribute
+if hasattr(Runner, 'app'):
+    attr = getattr(Runner, 'app')
+    if isinstance(attr, property):
+        print("Found 'app' property.")
+        try:
+            print(inspect.getsource(attr.fget))
+        except:
+            print("Could not get source of fget")
+    else:
+        print(f"'app' is {type(attr)}")
+else:
+    print("'app' not found in Runner class dict")

@@ -57,7 +57,8 @@ def get_session_service(db_url=None):
     """
     # Prioritize argument, then env var, then local default
     if not db_url:
-        db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///package_conflict_resolver.db")
+        # Use legacy_solver.db as it contains the existing sessions
+        db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///legacy_solver.db")
         
     session_service = DatabaseSessionService(db_url=db_url)
     logger.info(f"✅ Session service initialized: {db_url.split('://')[0]}://...") # Log safe URL
@@ -74,6 +75,7 @@ def get_memory_service():
     Uses Pinecone if PINECONE_API_KEY is set, otherwise InMemory.
     """
     pinecone_key = os.getenv("PINECONE_API_KEY")
+    logger.info(f"🔍 Checking PINECONE_API_KEY: {'Found' if pinecone_key else 'Missing'}")
     
     if pinecone_key:
         try:

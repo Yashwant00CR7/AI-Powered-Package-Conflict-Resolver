@@ -2,12 +2,20 @@
 Agent definitions for the AI-Powered Package Conflict Resolver.
 Defines Query Creator, Web Search, Web Crawl, and CodeSurgeon agents.
 """
+import sys
+import asyncio
+import json
+
+# Fix for Playwright on Windows (NotImplementedError in subprocess)
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from google.adk import Agent
-from google.adk.agents import SequentialAgent, LoopAgent, BaseAgent, ParallelAgent
-from google.adk.events import Event, EventActions
+from google.adk.agents import SequentialAgent, ParallelAgent
+# from google.adk.events import Event, EventActions # Unused after removing loop
 from google.adk.tools import google_search, load_memory
 from .config import get_model, get_gemini_model
-from .tools import batch_tool, adaptive_tool, save_context_tool, retrieve_context_tool, submit_queries_tool, validate_tool
+from .tools import batch_tool, adaptive_tool, save_context_tool, retrieve_context_tool, submit_queries_tool, validate_tool, retrieve_memory_tool
 from .utils import logger
 
 
@@ -19,12 +27,12 @@ def create_query_creator_agent():
     agent = Agent(
         name="Query_Creator_Agent",
         model=get_gemini_model(),
-        tools=[google_search, save_context_tool, load_memory], # Added load_memory
+        tools=[google_search, retrieve_memory_tool], # Added retrieve_memory_tool
         description="Dependency Detective specialized in diagnosing Python environment conflicts",
         instruction="""
         You are the "Dependency Detective," an expert AI agent specialized in diagnosing Python environment conflicts, legacy code rot, and version mismatch errors.
         Use Google Search Tool if You don't Know about those issue or packages.
-        Use `load_memory` to recall details from previous conversations if the user refers to "last time" or "previous error".
+        Use `retrieve_memory` to recall details from previous conversations if the user refers to "last time" or "previous error".
 
         YOUR GOAL:
         1. Analyze the input to identify the specific packages involved (e.g., "tensorflow", "numpy").
@@ -114,6 +122,35 @@ def create_community_search_agent():
     logger.info("✅ Community Search agent created")
     return agent
 
+def create_context_search_agent():
+    """
+    Creates the Context Search agent (General Context).
+    """
+    agent = Agent(
+        name="Context_Search_Agent",
+        model=get_gemini_model(),
+        tools=[google_search],
+        description="Search agent focused on general context and main URL",
+        instruction="""
+        You are the "Context Researcher".
+        
+        YOUR GOAL:
+        1. Analyze the input search queries to identify the "Main Topic" or "Core Library/Framework" (e.g., if input is "numpy float error", main topic is "numpy").
+        2. Search for the Home Page, Main Documentation Hub, or Wikipedia page for this Main Topic.
+        3. Provide the top 3-4 most authoritative URLs for this topic.
+        
+        INPUT: List of search queries.
+        OUTPUT: Top 3-4 most relevant URLs.
+        
+        OUTPUT FORMAT:
+        **Model: Gemini 2.5 Pro**
+        ## Context Results
+        {"top_urls": ["url1", "url2", "url3"]}
+        """
+    )
+    logger.info("✅ Context Search agent created")
+    return agent
+
 
 class WebCrawlAgent(Agent):
     """
@@ -147,16 +184,22 @@ class WebCrawlAgent(Agent):
         batch_result = await batch_crawl_tool.func(urls)
         
         # 2. Analyze Result (Simple Heuristic)
+        # Check if we got valid content
+        content = batch_result.get("combined_content", "")
+        
         # If result contains many "Error" or is very short, we might need adaptive
-        if "Error" not in batch_result and len(batch_result) > 500:
-             return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{batch_result}"
+        if "Error" not in content and len(content) > 500:
+             return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
              
         # 3. Fallback to Adaptive (if batch failed significantly)
         logger.info("⚠️ Batch crawl had issues. Falling back to Adaptive Crawl for first URL...")
         # For simplicity in this custom agent, we just try the first URL adaptively as a fallback
         adaptive_result = await adaptive_tool.func(urls[0], query="dependency conflicts version requirements")
         
-        return f"**Model: Custom Logic (Adaptive Fallback)**\n## Crawled Content Analysis\n\n{adaptive_result}"
+        # Format adaptive result (it's a dict)
+        formatted_adaptive = json.dumps(adaptive_result, indent=2) if isinstance(adaptive_result, dict) else str(adaptive_result)
+        
+        return f"**Model: Custom Logic (Adaptive Fallback)**\n## Crawled Content Analysis\n\n{formatted_adaptive}"
 
 def create_web_crawl_agent():
     """
@@ -202,64 +245,29 @@ def create_code_surgeon_agent():
         - Clear explanation of the issue
         - Updated requirements.txt content
         - Migration notes (if breaking changes exist)
+        
+        IMPORTANT:
+        - Call `save_context('solution', 'YOUR_SOLUTION_SUMMARY')` to store the final resolution.
+        - Call `save_context('requirements', 'YOUR_REQUIREMENTS_CONTENT')` to store the file content.
         """
     )
     logger.info("✅ Code Surgeon agent created")
     return agent
 
 
-def create_verification_agent():
-    """
-    Creates the Verification agent that checks the Code Surgeon's work.
-    """
-    agent = Agent(
-        name="Verification_Agent",
-        model=get_model(),
-        tools=[validate_tool, save_context_tool],
-        description="Quality Assurance specialist for dependency files",
-        instruction="""
-        You are the "Quality Assurance Specialist".
-        
-        YOUR TASK:
-        1. Review the 'requirements.txt' content generated by the Code Surgeon.
-        2. Use the `validate_requirements` tool to check for syntax errors.
-        3. If the tool returns "SUCCESS":
-           - Call `save_context('verification_status', 'SUCCESS')`.
-           - Respond with "Verification Passed".
-        4. If the tool returns errors:
-           - Call `save_context('verification_status', 'FAILED')`.
-           - Explain the errors to the Code Surgeon so they can fix it.
-        """
-    )
-    logger.info("✅ Verification agent created")
-    return agent
-
-
-class StopCheckerAgent(BaseAgent):
-    """
-    Agent that checks the verification status and stops the loop if successful.
-    """
-    async def _run_async_impl(self, ctx):
-        # Retrieve status from session state
-        status = ctx.session.state.get("verification_status", "FAILED")
-        logger.info(f"🛑 StopChecker: Status is {status}")
-        
-        should_stop = (status == "SUCCESS")
-        if should_stop:
-            logger.info("🛑 StopChecker: Escalating to stop loop.")
-            
-        # Yield an event with escalate=True if we should stop
-        yield Event(author=self.name, actions=EventActions(escalate=should_stop))
-
+# ===== MEMORY SERVICE =====
+from .config import get_memory_service
+global_memory_service = get_memory_service()
 
 # ===== MEMORY CALLBACK =====
 async def auto_save_to_memory(callback_context):
     """Automatically save session to memory after each agent turn."""
     try:
-        await callback_context._invocation_context.memory_service.add_session_to_memory(
+        # Use global memory service instead of context-bound one
+        await global_memory_service.add_session_to_memory(
             callback_context._invocation_context.session
         )
-        logger.info("💾 Session automatically saved to memory.")
+        logger.info("💾 Session automatically saved to memory (Global Service).")
     except Exception as e:
         logger.error(f"❌ Failed to auto-save session: {e}")
 
@@ -274,12 +282,13 @@ def create_root_agent():
     
     docs_search = create_docs_search_agent()
     community_search = create_community_search_agent()
+    context_search = create_context_search_agent()
     
     # Parallel Research
     parallel_search = ParallelAgent(
         name="Parallel_Search_Team",
-        sub_agents=[docs_search, community_search],
-        description="Parallel search for official and community resources"
+        sub_agents=[docs_search, community_search, context_search],
+        description="Parallel search for official, community, and general context resources"
     )
     
     # Group Research Team
@@ -292,22 +301,13 @@ def create_root_agent():
     web_crawl = create_web_crawl_agent()
     web_crawl = create_web_crawl_agent()
     
-    # Code Surgeon Loop
+    # Code Surgeon (No Loop)
     code_surgeon = create_code_surgeon_agent()
-    verification = create_verification_agent()
-    stop_checker = StopCheckerAgent(name="Stop_Checker")
-    
-    code_surgeon_team = LoopAgent(
-        name="Code_Surgeon_Team",
-        sub_agents=[code_surgeon, verification, stop_checker],
-        max_iterations=3,
-        description="Self-correcting dependency resolution team"
-    )
     
     # Create the sequential agent
     agent = SequentialAgent(
         name="Package_Conflict_Resolver_Root_Agent",
-        sub_agents=[web_research_team, web_crawl, code_surgeon_team],
+        sub_agents=[web_research_team, web_crawl, code_surgeon],
         description="Root agent managing the dependency resolution pipeline",
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
@@ -317,3 +317,7 @@ def create_root_agent():
 
 # ===== MODULE-LEVEL INITIALIZATION FOR ADK WEB =====
 root_agent = create_root_agent()
+
+# Removed App definition to avoid ImportError. 
+# Memory is handled via global_memory_service in callback.
+agent = root_agent

@@ -47,6 +47,9 @@ env/
 # Logs
 *.log
 
+#json
+*.evalset.json
+
 # OS
 .DS_Store
 Thumbs.db
