@@ -14,7 +14,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
@@ -34,4 +33,4 @@ EXPOSE 7860
 
 # Run the application
 # We point to 'src' because we created src/agent.py
-CMD ["adk", "web", "--host", "0.0.0.0", "--port", "7860", "src"]
+CMD ["adk", "web", "--host", "0.0.0.0", "--port", "7860"]
