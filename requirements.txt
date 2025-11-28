@@ -1,0 +1,11 @@
+google-adk
+crawl4ai
+aiosqlite
+sqlalchemy
+nest_asyncio
+python-dotenv
+certifi
+litellm
+pinecone
+sentence-transformers
+uvicorn
