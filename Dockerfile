@@ -33,4 +33,4 @@ EXPOSE 7860
 
 # Run the application
 # We point to 'src' because we created src/agent.py
-CMD ["adk", "web", "--host", "0.0.0.0", "--port", "7860", "src"]
+CMD ["adk", "web", "--host", "0.0.0.0", "--port", "7860"]
