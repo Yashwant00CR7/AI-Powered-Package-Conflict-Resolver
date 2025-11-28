@@ -8,3 +8,4 @@ certifi
 litellm
 pinecone
 sentence-transformers
+uvicorn
