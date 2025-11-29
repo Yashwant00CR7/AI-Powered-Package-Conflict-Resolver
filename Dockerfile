@@ -28,9 +28,8 @@ RUN playwright install --with-deps chromium
 # Copy the rest of the application
 COPY . .
 
-# Expose the port (Hugging Face Spaces use 7860)
+# Expose the port for Hugging Face Spaces
 EXPOSE 7860
 
-# Run the application
-# We point to 'src' because we created src/agent.py
-CMD ["adk", "web", "--host", "0.0.0.0", "--port", "7860"]
+# Run the combined server
+CMD ["python", "src/combined_server.py"]
