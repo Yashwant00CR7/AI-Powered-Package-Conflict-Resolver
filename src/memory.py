@@ -95,16 +95,16 @@ class PineconeMemoryService(BaseMemoryService):
 
     async def search_memory(
         self,
-        *,
-        app_name: str,
-        user_id: str,
         query: str,
-    ) -> SearchMemoryResponse:
+        limit: int = 3,
+        **kwargs
+    ) -> List[str]:
         """
         Searches Pinecone for relevant past sessions.
+        Returns a list of strings (memory text).
         """
         if not self.model:
-            return SearchMemoryResponse(memories=[])
+            return []
 
         try:
             # 1. Embed Query
@@ -113,7 +113,7 @@ class PineconeMemoryService(BaseMemoryService):
             # 2. Search Pinecone
             results = self.index.query(
                 vector=query_vector,
-                top_k=3, # Default limit
+                top_k=limit,
                 include_metadata=True
             )
             
@@ -122,20 +122,10 @@ class PineconeMemoryService(BaseMemoryService):
             for match in results['matches']:
                 if match['score'] > 0.5: # Relevance threshold
                     text = match['metadata'].get('text', '')
-                    session_id = match['metadata'].get('session_id', '')
-                    
-                    # Create MemoryEntry
-                    memory_entry = MemoryEntry(
-                        content=genai_types.Content(
-                            parts=[genai_types.Part.from_text(text=text)]
-                        ),
-                        custom_metadata={"score": match['score'], "session_id": session_id},
-                        id=match['id']
-                    )
-                    memories.append(memory_entry)
+                    memories.append(text)
             
-            return SearchMemoryResponse(memories=memories)
+            return memories
             
         except Exception as e:
             logger.error(f"❌ Failed to search Pinecone: {e}")
-            return SearchMemoryResponse(memories=[])
+            return []
