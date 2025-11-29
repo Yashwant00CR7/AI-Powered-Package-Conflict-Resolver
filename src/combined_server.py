@@ -126,59 +126,85 @@ async def handle_list_tools() -> list[types.Tool]:
 
 @mcp_server.call_tool()
 async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
-    if name == "solve_dependency_issue":
-        issue_description = arguments.get("issue_description")
-        if not issue_description:
-            raise ValueError("Missing issue_description")
-
-        from google.adk import Runner
-        from google.genai import types as genai_types
-        import uuid
-
-        session_id = f"mcp-session-{uuid.uuid4()}"
-        logger.info(f"MCP Tool Called: solve_dependency_issue (Session: {session_id})")
-
-        # Create session
-        await session_service.create_session(
-            session_id=session_id,
-            user_id="mcp_user",
-            app_name="package_conflict_resolver"
-        )
-
-        runner = Runner(
-            agent=root_agent,
-            app_name="package_conflict_resolver",
-            session_service=session_service
-        )
-
-        user_msg = genai_types.Content(
-            role="user",
-            parts=[genai_types.Part.from_text(text=issue_description)]
-        )
-
-        response_text = ""
-        
-        # Run agent and collect response
-        response_generator = runner.run(
-            session_id=session_id,
-            user_id="mcp_user",
-            new_message=user_msg
-        )
-
-        for event in response_generator:
-            if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-                if event.content.parts:
-                    text = event.content.parts[0].text
-                    if text and text != "None":
-                        response_text += text
-            elif hasattr(event, 'text'):
-                response_text += event.text
-            elif isinstance(event, str):
-                response_text += event
-
-        return [types.TextContent(type="text", text=response_text)]
+    logger.info(f"🔧 Tool called: {name} with arguments: {arguments}")
     
-    raise ValueError(f"Unknown tool: {name}")
+    try:
+        if name == "solve_dependency_issue":
+            issue_description = arguments.get("issue_description") if arguments else None
+            if not issue_description:
+                error_msg = "Missing issue_description parameter"
+                logger.error(f"❌ {error_msg}")
+                return [types.TextContent(type="text", text=f"Error: {error_msg}")]
+
+            from google.adk import Runner
+            from google.genai import types as genai_types
+            import uuid
+
+            session_id = f"mcp-session-{uuid.uuid4()}"
+            logger.info(f"✅ Processing tool call (Session: {session_id})")
+            logger.info(f"📝 Issue description: {issue_description[:100]}...")
+
+            try:
+                # Create session
+                await session_service.create_session(
+                    session_id=session_id,
+                    user_id="mcp_user",
+                    app_name="package_conflict_resolver"
+                )
+                logger.info(f"✅ Session created: {session_id}")
+
+                runner = Runner(
+                    agent=root_agent,
+                    app_name="package_conflict_resolver",
+                    session_service=session_service
+                )
+
+                user_msg = genai_types.Content(
+                    role="user",
+                    parts=[genai_types.Part.from_text(text=issue_description)]
+                )
+
+                response_text = ""
+                
+                # Run agent and collect response
+                logger.info("🤖 Running agent...")
+                response_generator = runner.run(
+                    session_id=session_id,
+                    user_id="mcp_user",
+                    new_message=user_msg
+                )
+
+                for event in response_generator:
+                    if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                        if event.content.parts:
+                            text = event.content.parts[0].text
+                            if text and text != "None":
+                                response_text += text
+                    elif hasattr(event, 'text'):
+                        response_text += event.text
+                    elif isinstance(event, str):
+                        response_text += event
+
+                logger.info(f"✅ Agent completed. Response length: {len(response_text)} chars")
+                
+                if not response_text:
+                    response_text = "No response generated from agent. Please check server logs."
+                
+                return [types.TextContent(type="text", text=response_text)]
+            
+            except Exception as e:
+                error_msg = f"Error running agent: {str(e)}"
+                logger.error(f"❌ {error_msg}", exc_info=True)
+                return [types.TextContent(type="text", text=f"Error: {error_msg}")]
+        
+        error_msg = f"Unknown tool: {name}"
+        logger.error(f"❌ {error_msg}")
+        return [types.TextContent(type="text", text=f"Error: {error_msg}")]
+    
+    except Exception as e:
+        error_msg = f"Unexpected error in tool handler: {str(e)}"
+        logger.error(f"❌ {error_msg}", exc_info=True)
+        return [types.TextContent(type="text", text=f"Error: {error_msg}")]
 
 # --- 5. Mount MCP SSE Endpoint ---
 
