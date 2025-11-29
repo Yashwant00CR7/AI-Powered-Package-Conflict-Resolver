@@ -27,7 +27,7 @@ def create_query_creator_agent():
     agent = Agent(
         name="Query_Creator_Agent",
         model=get_gemini_model(),
-        tools=[google_search], # Removed google_search to avoid conflict with custom tools
+        tools=[google_search], # used google_search to avoid conflict with custom tools
         description="Dependency Detective specialized in diagnosing Python environment conflicts",
         instruction="""
         You are the "Dependency Detective," an expert AI agent specialized in diagnosing Python environment conflicts, legacy code rot, and version mismatch errors.
@@ -272,11 +272,41 @@ async def auto_save_to_memory(callback_context):
         logger.error(f"❌ Failed to auto-save session: {e}")
 
 
+def create_memory_retrieval_agent():
+    """
+    Creates the Memory Retrieval agent.
+    Checks past sessions for similar issues.
+    """
+    agent = Agent(
+        name="Memory_Retrieval_Agent",
+        model=get_model(), # Use Grok or Gemini (Grok is fine for retrieval)
+        tools=[retrieve_memory_tool],
+        description="Agent that searches long-term memory for past solutions",
+        instruction="""
+        You are the "Memory Specialist".
+        
+        YOUR GOAL:
+        1. Analyze the user's input (error logs, package names).
+        2. Use `retrieve_memory` to search for similar past resolved sessions.
+        3. Summarize any relevant findings.
+        
+        OUTPUT:
+        - If relevant memory found: "Found similar past issue: [Summary]. Solution was: [Solution]"
+        - If no memory found: "No relevant past issues found."
+        """
+    )
+    logger.info("✅ Memory Retrieval agent created")
+    return agent
+
+
 def create_root_agent():
     """
     Creates the root agent that orchestrates the sub-agents.
     """
-    # Create sub-agents
+    # 1. Memory Retrieval (Separate Agent to avoid Tool Conflict)
+    memory_agent = create_memory_retrieval_agent()
+
+    # 2. Research Team
     query_creator = create_query_creator_agent()
     # load_memory removed due to model limitations
     
@@ -299,19 +329,20 @@ def create_root_agent():
     )
     
     web_crawl = create_web_crawl_agent()
-    web_crawl = create_web_crawl_agent()
+    # web_crawl = create_web_crawl_agent() # Duplicate removed
     
     # Code Surgeon (No Loop)
     code_surgeon = create_code_surgeon_agent()
     
     # Create the sequential agent
+    # Flow: Memory -> Research (Query+Search) -> Crawl -> Surgeon
     agent = SequentialAgent(
         name="Package_Conflict_Resolver_Root_Agent",
-        sub_agents=[web_research_team, web_crawl, code_surgeon],
+        sub_agents=[memory_agent, web_research_team, web_crawl, code_surgeon],
         description="Root agent managing the dependency resolution pipeline",
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
-    logger.info("✅ Root agent created with sequential flow (Research Team -> Crawl -> Surgeon)")
+    logger.info("✅ Root agent created with sequential flow (Memory -> Research -> Crawl -> Surgeon)")
     return agent
 
 
