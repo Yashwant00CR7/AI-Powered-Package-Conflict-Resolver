@@ -1,13 +1,14 @@
 import os
 import uuid
-from typing import List, Dict, Any
-from typing import List, Dict, Any
-# from google.adk.memory import MemoryService # Not available in this version
+from typing import List, Dict, Any, Optional
+from google.adk.memory.base_memory_service import BaseMemoryService, SearchMemoryResponse
+from google.adk.memory.memory_entry import MemoryEntry
+from google.genai import types as genai_types
 from pinecone import Pinecone, ServerlessSpec
 from sentence_transformers import SentenceTransformer
 from .utils import logger
 
-class PineconeMemoryService: # Removed inheritance to avoid ImportError
+class PineconeMemoryService(BaseMemoryService):
     """
     Custom Memory Service using Pinecone for long-term vector storage.
     Uses 'all-MiniLM-L6-v2' for local embedding generation.
@@ -34,44 +35,42 @@ class PineconeMemoryService: # Removed inheritance to avoid ImportError
         
         # Initialize Embedding Model
         logger.info("🧠 Loading embedding model: all-MiniLM-L6-v2... (This may take a while if downloading)")
-        print("DEBUG: Starting SentenceTransformer load...")
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("DEBUG: SentenceTransformer loaded.")
+        try:
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("✅ SentenceTransformer loaded.")
+        except Exception as e:
+            logger.error(f"❌ Failed to load SentenceTransformer: {e}")
+            self.model = None
+        
         logger.info("✅ Pinecone Memory Service initialized")
 
     async def add_session_to_memory(self, session: Any):
         """
         Embeds the session history and saves it to Pinecone.
         """
+        if not self.model:
+            logger.warning("⚠️ Embedding model not loaded. Skipping memory save.")
+            return
+
         try:
-            # Get session ID safely (ADK sessions usually use .id)
+            # Get session ID safely
             session_id = getattr(session, 'id', getattr(session, 'session_id', 'UNKNOWN'))
             
             logger.info(f"💾 Attempting to save session to Pinecone. Session ID: {session_id}")
-            # Debug session structure
-            # logger.info(f"Session dir: {dir(session)}")
 
             # 1. Convert session to text
-            # Assuming session has a 'history' or we can iterate turns
-            # We'll construct a simplified text representation
             text_content = ""
             
-            # Check for 'turns' or 'events'
             if hasattr(session, 'turns'):
                 turns = session.turns
-                logger.info(f"Found {len(turns)} turns.")
                 for turn in turns:
                     text_content += f"{turn.role}: {turn.content}\n"
             elif hasattr(session, 'events'):
                 events = session.events
-                logger.info(f"Found {len(events)} events.")
                 for event in events:
-                    # Event structure might vary
                     author = getattr(event, 'author', 'unknown')
                     content = getattr(event, 'content', getattr(event, 'text', ''))
                     text_content += f"{author}: {content}\n"
-            else:
-                logger.warning("⚠️ Session has no 'turns' or 'events' attribute.")
             
             if not text_content.strip():
                 logger.warning("⚠️ Session content is empty. Skipping Pinecone save.")
@@ -88,17 +87,25 @@ class PineconeMemoryService: # Removed inheritance to avoid ImportError
             }
             
             # 4. Upsert to Pinecone
-            # Use session_id as vector ID
             self.index.upsert(vectors=[(session_id, vector, metadata)])
             logger.info(f"💾 Saved session {session_id} to Pinecone")
             
         except Exception as e:
             logger.error(f"❌ Failed to save to Pinecone: {e}")
 
-    async def search_memory(self, query: str, limit: int = 3) -> List[str]:
+    async def search_memory(
+        self,
+        *,
+        app_name: str,
+        user_id: str,
+        query: str,
+    ) -> SearchMemoryResponse:
         """
         Searches Pinecone for relevant past sessions.
         """
+        if not self.model:
+            return SearchMemoryResponse(memories=[])
+
         try:
             # 1. Embed Query
             query_vector = self.model.encode(query).tolist()
@@ -106,7 +113,7 @@ class PineconeMemoryService: # Removed inheritance to avoid ImportError
             # 2. Search Pinecone
             results = self.index.query(
                 vector=query_vector,
-                top_k=limit,
+                top_k=3, # Default limit
                 include_metadata=True
             )
             
@@ -114,10 +121,21 @@ class PineconeMemoryService: # Removed inheritance to avoid ImportError
             memories = []
             for match in results['matches']:
                 if match['score'] > 0.5: # Relevance threshold
-                    memories.append(match['metadata']['text'])
+                    text = match['metadata'].get('text', '')
+                    session_id = match['metadata'].get('session_id', '')
+                    
+                    # Create MemoryEntry
+                    memory_entry = MemoryEntry(
+                        content=genai_types.Content(
+                            parts=[genai_types.Part.from_text(text=text)]
+                        ),
+                        custom_metadata={"score": match['score'], "session_id": session_id},
+                        id=match['id']
+                    )
+                    memories.append(memory_entry)
             
-            return memories
+            return SearchMemoryResponse(memories=memories)
             
         except Exception as e:
             logger.error(f"❌ Failed to search Pinecone: {e}")
-            return []
+            return SearchMemoryResponse(memories=[])
