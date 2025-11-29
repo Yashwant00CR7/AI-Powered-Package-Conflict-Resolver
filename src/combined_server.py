@@ -67,8 +67,8 @@ credential_service = LocalCredentialService(base_dir=os.path.join(data_dir, "cre
 from google.adk.evaluation.local_eval_sets_manager import LocalEvalSetsManager
 from google.adk.evaluation.local_eval_set_results_manager import LocalEvalSetResultsManager
 
-eval_sets_manager = LocalEvalSetsManager(base_dir=os.path.join(data_dir, "eval_sets"))
-eval_set_results_manager = LocalEvalSetResultsManager(base_dir=os.path.join(data_dir, "eval_results"))
+eval_sets_manager = LocalEvalSetsManager(agents_dir=data_dir)
+eval_set_results_manager = LocalEvalSetResultsManager(agents_dir=data_dir)
 
 logger.info("🤖 Creating Root Agent...")
 root_agent = create_root_agent()
