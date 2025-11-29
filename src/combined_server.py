@@ -194,6 +194,12 @@ async def handle_messages(request: Request):
     await sse_transport.handle_post_message(request.scope, request.receive, request._send)
     return {}
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/dev-ui/")
+
 logger.info("✅ Combined Server Configured")
 logger.info("👉 Web UI: http://0.0.0.0:7860/dev-ui/")
 logger.info("👉 MCP SSE: http://0.0.0.0:7860/mcp/sse")
