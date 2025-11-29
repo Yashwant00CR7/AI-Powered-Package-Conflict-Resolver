@@ -205,6 +205,32 @@ from fastapi.responses import RedirectResponse
 async def root():
     return RedirectResponse(url="/dev-ui/")
 
+# --- Add Builder Route (Fixes 404) ---
+from fastapi.responses import PlainTextResponse, FileResponse
+from pathlib import Path
+
+@app.get(
+    "/builder/app/{app_name}",
+    response_model_exclude_none=True,
+    response_class=PlainTextResponse,
+)
+async def get_agent_builder(
+    app_name: str,
+    file_path: Optional[str] = None,
+    tmp: Optional[bool] = False,
+):
+    # We use the same agents_dir as defined above
+    agents_path = Path(os.path.abspath("src"))
+    agent_dir = agents_path # In our case, src is the root for the agent code
+    
+    # If app_name is "package_conflict_resolver", it might be looking for a subdir
+    # But our code is in src/agents.py. 
+    # The standard ADK structure has agents_dir/app_name/root_agent.yaml
+    # We don't have that structure or YAML files.
+    # So we just return empty string to satisfy the UI, as we are code-first.
+    
+    return ""
+
 logger.info("✅ Combined Server Configured")
 logger.info("👉 Web UI: http://0.0.0.0:7860/dev-ui/")
 logger.info("👉 MCP SSE: http://0.0.0.0:7860/mcp/sse")
