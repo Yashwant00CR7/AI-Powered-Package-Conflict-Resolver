@@ -92,8 +92,13 @@ adk_server = AdkWebServer(
     agents_dir=os.path.abspath("src")
 )
 
+# Calculate web_assets_dir dynamically
+import google.adk.cli
+web_assets_dir = os.path.join(os.path.dirname(google.adk.cli.__file__), "browser")
+logger.info(f"📂 Serving Web UI from: {web_assets_dir}")
+
 # This is the main FastAPI app
-app = adk_server.get_fast_api_app()
+app = adk_server.get_fast_api_app(web_assets_dir=web_assets_dir)
 
 # --- 4. Create MCP Server (Standard Implementation) ---
 
