@@ -182,32 +182,32 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 
 # --- 5. Mount MCP SSE Endpoint ---
 
-# We need to manage the SSE transport manually
+# We need to manage the SSE transport manually using raw ASGI routes
 sse_transport = SseServerTransport("/mcp/messages")
 
-@app.get("/mcp/sse")
-async def handle_sse(request: Request):
-    async def event_generator():
-        try:
-            async with mcp_server.run_sse(sse_transport) as streams:
-                logger.info("✅ MCP SSE Stream Started")
-                async for message in streams[1]:
-                    # logger.info(f"📤 Yielding message type: {type(message)}")
-                    # Ensure message is compatible with sse_starlette
-                    if isinstance(message, types.ServerMessage):
-                        yield message.model_dump_json()
-                    else:
-                        yield message
-        except Exception as e:
-            logger.error(f"❌ SSE Generator Error: {e}", exc_info=True)
-            raise
+async def handle_sse(scope, receive, send):
+    """
+    Raw ASGI handler for SSE endpoint.
+    Uses sse_transport.connect_sse to manage the connection and streams.
+    """
+    async with sse_transport.connect_sse(scope, receive, send) as (read_stream, write_stream):
+        # Run the MCP server with the streams
+        await mcp_server.run(
+            read_stream,
+            write_stream,
+            mcp_server.create_initialization_options()
+        )
 
-    return EventSourceResponse(event_generator())
+async def handle_messages(scope, receive, send):
+    """
+    Raw ASGI handler for Messages endpoint.
+    Delegates to sse_transport.handle_post_message.
+    """
+    await sse_transport.handle_post_message(scope, receive, send)
 
-@app.post("/mcp/messages")
-async def handle_messages(request: Request):
-    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
-    return {}
+# Add routes directly to the FastAPI app (which is a Starlette app)
+app.add_route("/mcp/sse", handle_sse, methods=["GET"])
+app.add_route("/mcp/messages", handle_messages, methods=["POST"])
 
 from fastapi.responses import RedirectResponse
 
