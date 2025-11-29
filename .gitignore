@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+AI-Package-Doctor/
 *.py[cod]
 *$py.class
 *.so

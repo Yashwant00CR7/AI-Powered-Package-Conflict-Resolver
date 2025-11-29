@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "AI-Package-Doctor": {
+      "url": "https://yash030-ai-package-doctor.hf.space/mcp/sse",
+      "transport": "sse"
+    }
+  }
+}
