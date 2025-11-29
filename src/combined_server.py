@@ -185,12 +185,12 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 # We need to manage the SSE transport manually using raw ASGI routes
 sse_transport = SseServerTransport("/mcp/messages")
 
-async def handle_sse(scope, receive, send):
+async def handle_sse(request: Request):
     """
-    Raw ASGI handler for SSE endpoint.
+    Handler for SSE endpoint.
     Uses sse_transport.connect_sse to manage the connection and streams.
     """
-    async with sse_transport.connect_sse(scope, receive, send) as (read_stream, write_stream):
+    async with sse_transport.connect_sse(request.scope, request.receive, request._send) as (read_stream, write_stream):
         # Run the MCP server with the streams
         await mcp_server.run(
             read_stream,
@@ -198,12 +198,12 @@ async def handle_sse(scope, receive, send):
             mcp_server.create_initialization_options()
         )
 
-async def handle_messages(scope, receive, send):
+async def handle_messages(request: Request):
     """
-    Raw ASGI handler for Messages endpoint.
+    Handler for Messages endpoint.
     Delegates to sse_transport.handle_post_message.
     """
-    await sse_transport.handle_post_message(scope, receive, send)
+    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
 
 # Add routes directly to the FastAPI app (which is a Starlette app)
 app.add_route("/mcp/sse", handle_sse, methods=["GET"])
