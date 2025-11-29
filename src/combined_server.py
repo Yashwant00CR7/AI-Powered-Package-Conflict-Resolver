@@ -63,8 +63,12 @@ os.makedirs(data_dir, exist_ok=True)
 
 artifact_service = FileArtifactService(root_dir=os.path.join(data_dir, "artifacts"))
 credential_service = LocalCredentialService(base_dir=os.path.join(data_dir, "credentials"))
-eval_sets_manager = EvalSetsManager()
-eval_set_results_manager = EvalSetResultsManager()
+# Import concrete implementations
+from google.adk.evaluation.local_eval_sets_manager import LocalEvalSetsManager
+from google.adk.evaluation.local_eval_set_results_manager import LocalEvalSetResultsManager
+
+eval_sets_manager = LocalEvalSetsManager(base_dir=os.path.join(data_dir, "eval_sets"))
+eval_set_results_manager = LocalEvalSetResultsManager(base_dir=os.path.join(data_dir, "eval_results"))
 
 logger.info("🤖 Creating Root Agent...")
 root_agent = create_root_agent()
