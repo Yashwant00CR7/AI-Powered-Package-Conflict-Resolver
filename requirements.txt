@@ -9,3 +9,5 @@ litellm
 pinecone
 sentence-transformers
 uvicorn
+mcp
+sse-starlette
