@@ -188,9 +188,19 @@ sse_transport = SseServerTransport("/mcp/messages")
 @app.get("/mcp/sse")
 async def handle_sse(request: Request):
     async def event_generator():
-        async with mcp_server.run_sse(sse_transport) as streams:
-            async for message in streams[1]:
-                yield message
+        try:
+            async with mcp_server.run_sse(sse_transport) as streams:
+                logger.info("✅ MCP SSE Stream Started")
+                async for message in streams[1]:
+                    # logger.info(f"📤 Yielding message type: {type(message)}")
+                    # Ensure message is compatible with sse_starlette
+                    if isinstance(message, types.ServerMessage):
+                        yield message.model_dump_json()
+                    else:
+                        yield message
+        except Exception as e:
+            logger.error(f"❌ SSE Generator Error: {e}", exc_info=True)
+            raise
 
     return EventSourceResponse(event_generator())
 
