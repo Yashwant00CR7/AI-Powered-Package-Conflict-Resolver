@@ -5,10 +5,12 @@ Runs both the ADK Web UI and the MCP Server on the same FastAPI app.
 import os
 import uvicorn
 import nest_asyncio
-from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP
+from fastapi import FastAPI, Request
 from sse_starlette.sse import EventSourceResponse
-from starlette.requests import Request
+from mcp.server import Server
+from mcp.server.sse import SseServerTransport
+from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
+import mcp.types as types
 
 # ADK Imports
 from google.adk.cli.adk_web_server import (
@@ -16,6 +18,10 @@ from google.adk.cli.adk_web_server import (
     BaseCredentialService
 )
 from google.adk.artifacts import FileArtifactService
+# Import concrete implementations
+from google.adk.evaluation.local_eval_sets_manager import LocalEvalSetsManager
+from google.adk.evaluation.local_eval_set_results_manager import LocalEvalSetResultsManager
+
 from src.config import get_session_service, get_memory_service
 from src.agents import create_root_agent
 from src.utils import logger
@@ -63,10 +69,8 @@ os.makedirs(data_dir, exist_ok=True)
 
 artifact_service = FileArtifactService(root_dir=os.path.join(data_dir, "artifacts"))
 credential_service = LocalCredentialService(base_dir=os.path.join(data_dir, "credentials"))
-# Import concrete implementations
-from google.adk.evaluation.local_eval_sets_manager import LocalEvalSetsManager
-from google.adk.evaluation.local_eval_set_results_manager import LocalEvalSetResultsManager
 
+# Use concrete managers with correct arguments
 eval_sets_manager = LocalEvalSetsManager(agents_dir=data_dir)
 eval_set_results_manager = LocalEvalSetResultsManager(agents_dir=data_dir)
 
@@ -91,76 +95,104 @@ adk_server = AdkWebServer(
 # This is the main FastAPI app
 app = adk_server.get_fast_api_app()
 
-# --- 4. Create MCP Server ---
+# --- 4. Create MCP Server (Standard Implementation) ---
 
 logger.info("🔌 Creating MCP Server...")
-mcp = FastMCP("AI-Package-Doctor")
+mcp_server = Server("AI-Package-Doctor")
 
-@mcp.tool()
-async def solve_dependency_issue(issue_description: str) -> str:
-    """
-    Analyzes and resolves Python dependency conflicts based on a description.
+@mcp_server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    return [
+        types.Tool(
+            name="solve_dependency_issue",
+            description="Analyzes and resolves Python dependency conflicts based on a description.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "issue_description": {
+                        "type": "string",
+                        "description": "A detailed description of the dependency problem, error logs, or requirements.txt content."
+                    }
+                },
+                "required": ["issue_description"]
+            }
+        )
+    ]
+
+@mcp_server.call_tool()
+async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    if name == "solve_dependency_issue":
+        issue_description = arguments.get("issue_description")
+        if not issue_description:
+            raise ValueError("Missing issue_description")
+
+        from google.adk import Runner
+        from google.genai import types as genai_types
+        import uuid
+
+        session_id = f"mcp-session-{uuid.uuid4()}"
+        logger.info(f"MCP Tool Called: solve_dependency_issue (Session: {session_id})")
+
+        # Create session
+        await session_service.create_session(
+            session_id=session_id,
+            user_id="mcp_user",
+            app_name="package_conflict_resolver"
+        )
+
+        runner = Runner(
+            agent=root_agent,
+            app_name="package_conflict_resolver",
+            session_service=session_service
+        )
+
+        user_msg = genai_types.Content(
+            role="user",
+            parts=[genai_types.Part.from_text(text=issue_description)]
+        )
+
+        response_text = ""
+        
+        # Run agent and collect response
+        response_generator = runner.run(
+            session_id=session_id,
+            user_id="mcp_user",
+            new_message=user_msg
+        )
+
+        for event in response_generator:
+            if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                if event.content.parts:
+                    text = event.content.parts[0].text
+                    if text and text != "None":
+                        response_text += text
+            elif hasattr(event, 'text'):
+                response_text += event.text
+            elif isinstance(event, str):
+                response_text += event
+
+        return [types.TextContent(type="text", text=response_text)]
     
-    Args:
-        issue_description: A detailed description of the dependency problem, error logs, or requirements.txt content.
-    """
-    from google.adk import Runner
-    from google.genai import types
-    import uuid
+    raise ValueError(f"Unknown tool: {name}")
 
-    session_id = f"mcp-session-{uuid.uuid4()}"
-    logger.info(f"MCP Tool Called: solve_dependency_issue (Session: {session_id})")
+# --- 5. Mount MCP SSE Endpoint ---
 
-    # Create session
-    await session_service.create_session(
-        session_id=session_id,
-        user_id="mcp_user",
-        app_name="package_conflict_resolver"
-    )
+# We need to manage the SSE transport manually
+sse_transport = SseServerTransport("/mcp/messages")
 
-    runner = Runner(
-        agent=root_agent,
-        app_name="package_conflict_resolver",
-        session_service=session_service
-    )
+@app.get("/mcp/sse")
+async def handle_sse(request: Request):
+    async with mcp_server.run_sse(sse_transport) as streams:
+        async def event_generator():
+            async for message in streams[1]:
+                yield message
+        
+        return EventSourceResponse(event_generator())
 
-    user_msg = types.Content(
-        role="user",
-        parts=[types.Part.from_text(text=issue_description)]
-    )
-
-    response_text = ""
-    
-    # Run agent and collect response
-    # Note: This runs synchronously in the async function, blocking this request.
-    # Ideally we'd stream, but for a simple tool return we collect all.
-    response_generator = runner.run(
-        session_id=session_id,
-        user_id="mcp_user",
-        new_message=user_msg
-    )
-
-    for event in response_generator:
-        if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-            if event.content.parts:
-                text = event.content.parts[0].text
-                if text and text != "None":
-                    response_text += text
-        elif hasattr(event, 'text'):
-            response_text += event.text
-        elif isinstance(event, str):
-            response_text += event
-
-    return response_text
-
-# --- 5. Mount MCP to FastAPI ---
-
-# FastMCP provides a way to mount itself, but we want to be explicit about the SSE endpoint
-# to ensure it works with the existing app.
-# We will use the mcp.mount_to_fastapi method if available, or manually add the routes.
-
-# FastMCP's mount_to_fastapi is the easiest way
-mcp.mount_to_fastapi(app, path="/mcp")
+@app.post("/mcp/messages")
+async def handle_messages(request: Request):
+    await sse_transport.handle_post_message(request.scope, request.receive, request._send)
+    return {}
 
 logger.info("✅ Combined Server Configured")
 logger.info("👉 Web UI: http://0.0.0.0:7860/dev-ui/")
