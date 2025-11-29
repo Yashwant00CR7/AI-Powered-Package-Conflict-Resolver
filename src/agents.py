@@ -206,10 +206,12 @@ def create_web_crawl_agent():
     Creates the Web Crawl agent (Content Extractor).
     Now uses the Custom WebCrawlAgent class.
     """
+    # We pass tools=[] to the parent Agent so the LLM doesn't see them and try to call them.
+    # The custom run() method will use the tools directly.
     agent = WebCrawlAgent(
         name="Web_Crawl_Agent",
         model=get_model(),
-        tools=[batch_tool, adaptive_tool],
+        tools=[], # HIDE TOOLS FROM LLM to prevent hallucinated/parallel calls
         description="Technical Content Extractor using Deterministic Logic",
         instruction="""
         You are the "Technical Content Extractor".
