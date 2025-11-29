@@ -187,12 +187,12 @@ sse_transport = SseServerTransport("/mcp/messages")
 
 @app.get("/mcp/sse")
 async def handle_sse(request: Request):
-    async with mcp_server.run_sse(sse_transport) as streams:
-        async def event_generator():
+    async def event_generator():
+        async with mcp_server.run_sse(sse_transport) as streams:
             async for message in streams[1]:
                 yield message
-        
-        return EventSourceResponse(event_generator())
+
+    return EventSourceResponse(event_generator())
 
 @app.post("/mcp/messages")
 async def handle_messages(request: Request):
