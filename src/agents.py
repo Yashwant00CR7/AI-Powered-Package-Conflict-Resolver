@@ -305,88 +305,16 @@ def create_memory_retrieval_agent():
 
 
 
-# Triage Agent Definition
-def create_triage_agent():
-    """
-    Creates the Triage agent that decides whether to proceed or ask for more info.
-    """
-    agent = Agent(
-        name="Triage_Agent",
-        model=get_gemini_model(),
-        tools=[], # No tools for Gemini as requested
-        description="Gatekeeper agent that checks if user input has enough context",
-        instruction="""
-        You are the "Triage Agent" for the Package Doctor.
-        
-        YOUR GOAL:
-        Analyze the user's input to determine if it contains enough technical context (package names, error messages, specific problem descriptions) to start a diagnosis.
-        
-        RULES:
-        1. If the input is a Greeting ("Hi", "Hello") or Vague ("Help me", "I have an error", "It's broken"):
-           - Return a response starting with "WAITING:".
-           - Follow it with a polite request for more details.
-           - Example: "WAITING: Hello! I'm the Package Doctor. Could you please provide the `requirements.txt` file or describe the specific error you are facing?"
-           
-        2. If the input has Specific Context ("conflict between numpy and tf", "ImportError", "ModuleNotFoundError", code snippets, or ANY stack trace):
-           - Return "PROCEED:".
-           - DO NOT add any conversational text after "PROCEED:". The Orchestrator will handle the handoff.
-           
-        3. If the user asks a general question unrelated to dependencies ("What is the weather?"):
-           - Return "WAITING: I specialize in package conflicts. Can I help you with a Python environment issue?"
-           
-        CRITICAL: If the user pastes an error log, stack trace, or requirements.txt content, ALWAYS return "PROCEED:".
-        """
-    )
-    logger.info("✅ Triage agent created")
-    return agent
-
-class OrchestratorAgent(Agent):
-    """
-    Custom Agent that orchestrates the flow between Triage and the Resolution Pipeline.
-    """
-    # Declare fields for Pydantic/ADK compatibility
-    triage_agent: Any
-    resolution_pipeline: Any
-
-    def __init__(self, triage_agent, resolution_pipeline, **kwargs):
-        # Initialize with dummy model/tools as we delegate everything
-        # Pass custom fields to super().__init__ so Pydantic validates and sets them
-        super().__init__(
-            model=triage_agent.model, 
-            tools=[], 
-            name="Orchestrator_Agent", 
-            triage_agent=triage_agent,
-            resolution_pipeline=resolution_pipeline,
-            **kwargs
-        )
-
-    async def run(self, input_str: str, **kwargs):
-        """
-        Orchestrates the flow: Triage -> Resolution Pipeline.
-        """
-        logger.info(f"🤖 Orchestrator received: {input_str}")
-        
-        # 1. Triage
-        triage_response = await self.triage_agent.run(input_str)
-        
-        # 2. Check Decision
-        if "PROCEED:" in triage_response:
-            logger.info("✅ Triage approved. Starting Resolution Pipeline...")
-            return await self.resolution_pipeline.run(input_str)
-        else:
-            logger.info("🛑 Triage waiting for more info.")
-            return triage_response
-
 def create_root_agent():
     """
-    Creates the root Orchestrator agent.
+    Creates the root agent (Resolution Pipeline).
+    Directly returns the sequential pipeline, bypassing Triage/Orchestrator.
     """
-    # 1. Memory Retrieval (Separate Agent to avoid Tool Conflict)
+    # 1. Memory Retrieval
     memory_agent = create_memory_retrieval_agent()
 
     # 2. Research Team
     query_creator = create_query_creator_agent()
-    # load_memory removed due to model limitations
     
     docs_search = create_docs_search_agent()
     community_search = create_community_search_agent()
@@ -407,9 +335,8 @@ def create_root_agent():
     )
     
     web_crawl = create_web_crawl_agent()
-    # web_crawl = create_web_crawl_agent() # Duplicate removed
     
-    # Code Surgeon (No Loop)
+    # Code Surgeon
     code_surgeon = create_code_surgeon_agent()
     
     # Create the sequential pipeline (The "Heavy" Lifters)
@@ -421,18 +348,8 @@ def create_root_agent():
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
     
-    # Create Triage Agent
-    triage_agent = create_triage_agent()
-    
-    # Create Orchestrator
-    agent = OrchestratorAgent(
-        triage_agent=triage_agent,
-        resolution_pipeline=resolution_pipeline,
-        description="Root agent managing the triage and resolution flow"
-    )
-    
-    logger.info("✅ Root agent created with Orchestrator flow (Triage -> [Pipeline])")
-    return agent
+    logger.info("✅ Root agent created (Direct Resolution Pipeline)")
+    return resolution_pipeline
 
 
 # ===== MODULE-LEVEL INITIALIZATION FOR ADK WEB =====
