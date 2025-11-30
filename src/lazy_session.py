@@ -62,14 +62,14 @@ class LazyDatabaseSessionService(DatabaseSessionService):
     async def add_message(self, session_id: str, message: types.Content) -> None:
         """
         On first message, persists the session to DB before adding the message.
+        Note: The Runner might call append_event directly, so we handle it there too.
         """
         # 1. Check if this is a pending session
         if session_id in self._pending_sessions:
-            logger.info(f"⏰ Waking up Lazy Session: {session_id}")
+            logger.info(f"⏰ Waking up Lazy Session (add_message): {session_id}")
             meta = self._pending_sessions.pop(session_id)
             
             # Persist the session now!
-            # We call super().create_session to actually write to DB
             await super().create_session(
                 session_id=session_id,
                 user_id=meta["user_id"],
@@ -80,6 +80,30 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             
         # 2. Add the message (Super)
         await super().add_message(session_id, message)
+
+    async def append_event(self, session: Session, event: Any) -> None:
+        """
+        Overrides append_event to ensure session exists in DB before appending.
+        The Runner calls this method to add user messages/events.
+        """
+        session_id = session.id
+        
+        # 1. Check if this is a pending session
+        if session_id in self._pending_sessions:
+            logger.info(f"⏰ Waking up Lazy Session (append_event): {session_id}")
+            meta = self._pending_sessions.pop(session_id)
+            
+            # Persist the session now!
+            await super().create_session(
+                session_id=session_id,
+                user_id=meta["user_id"],
+                app_name=meta["app_name"],
+                **meta["kwargs"]
+            )
+            logger.info(f"💾 Session {session_id} persisted to DB.")
+            
+        # 2. Append the event (Super)
+        await super().append_event(session, event)
 
     async def list_sessions(self, app_name: str = None, **kwargs) -> List[Session]:
         """
