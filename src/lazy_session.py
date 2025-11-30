@@ -52,7 +52,8 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             )
             
         # 2. Check DB (Super)
-        return await super().get_session(session_id, **kwargs)
+        # FIX: DatabaseSessionService.get_session likely only accepts session_id
+        return await super().get_session(session_id)
 
     async def add_message(self, session_id: str, message: types.Content) -> None:
         """
