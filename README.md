@@ -1,11 +1,3 @@
----
-title: Package Conflict Identifier
-emoji: 📦
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-pinned: false
----
 
 # Package Conflict Identifier 📦🔍
 
@@ -52,6 +44,10 @@ package_conflict_resolver/
 │   └── utils.py          # Logging & Helpers
 └── ...
 ```
+## Architecture 
+
+![Image](https://github.com/user-attachments/assets/ee299a66-8601-494a-a2ba-d102b036dff2)
+<br>
 
 ## 🚀 Quick Start
 
@@ -107,6 +103,7 @@ Add the following to your `claude_desktop_config.json`:
   }
 }
 ```
+
 
 Once connected, you can ask Claude:
 > "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
