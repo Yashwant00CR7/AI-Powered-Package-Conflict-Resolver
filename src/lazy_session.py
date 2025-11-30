@@ -1,0 +1,86 @@
+
+from typing import Optional, Dict, Any, List, AsyncGenerator
+from google.adk.sessions import DatabaseSessionService, Session
+from google.genai import types
+import uuid
+from .utils import logger
+
+class LazyDatabaseSessionService(DatabaseSessionService):
+    """
+    A session service that defers database insertion until the first message is added.
+    This prevents empty sessions from cluttering the database on page loads.
+    """
+    def __init__(self, db_url: str):
+        super().__init__(db_url=db_url)
+        # In-memory store for pending sessions: {session_id: {metadata}}
+        self._pending_sessions: Dict[str, Dict[str, Any]] = {}
+
+    async def create_session(self, session_id: str, user_id: str, app_name: str, **kwargs) -> Session:
+        """
+        Overrides create_session to store metadata in memory instead of DB.
+        """
+        logger.info(f"💤 Lazy Session Created (Pending): {session_id}")
+        
+        # Store metadata for later
+        self._pending_sessions[session_id] = {
+            "user_id": user_id,
+            "app_name": app_name,
+            "kwargs": kwargs
+        }
+        
+        # Return a temporary Session object (not persisted yet)
+        # We need to mimic what the base class returns
+        return Session(
+            session_id=session_id,
+            user_id=user_id,
+            app_name=app_name,
+            history=[]
+        )
+
+    async def get_session(self, session_id: str) -> Optional[Session]:
+        """
+        Checks pending sessions first, then falls back to DB.
+        """
+        # 1. Check pending
+        if session_id in self._pending_sessions:
+            meta = self._pending_sessions[session_id]
+            # Return a fresh Session object from memory metadata
+            return Session(
+                session_id=session_id,
+                user_id=meta["user_id"],
+                app_name=meta["app_name"],
+                history=[]
+            )
+            
+        # 2. Check DB (Super)
+        return await super().get_session(session_id)
+
+    async def add_message(self, session_id: str, message: types.Content) -> None:
+        """
+        On first message, persists the session to DB before adding the message.
+        """
+        # 1. Check if this is a pending session
+        if session_id in self._pending_sessions:
+            logger.info(f"⏰ Waking up Lazy Session: {session_id}")
+            meta = self._pending_sessions.pop(session_id)
+            
+            # Persist the session now!
+            # We call super().create_session to actually write to DB
+            await super().create_session(
+                session_id=session_id,
+                user_id=meta["user_id"],
+                app_name=meta["app_name"],
+                **meta["kwargs"]
+            )
+            logger.info(f"💾 Session {session_id} persisted to DB.")
+            
+        # 2. Add the message (Super)
+        await super().add_message(session_id, message)
+
+    async def list_sessions(self, app_name: str = None, user_id: str = None, limit: int = 10, offset: int = 0) -> List[Session]:
+        """
+        Overrides list_sessions to EXCLUDE pending sessions.
+        This ensures they don't show up in the UI history list.
+        """
+        # Only return sessions that are actually in the DB
+        return await super().list_sessions(app_name, user_id, limit, offset)
