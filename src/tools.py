@@ -202,19 +202,13 @@ submit_queries_tool = FunctionTool(submit_queries)
 def validate_requirements(tool_context: ToolContext, requirements_content: str) -> str:
     if not requirements_content:
         return "Error: Empty requirements content."
-    lines = requirements_content.strip().split('\n')
-    errors = []
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        import re
-        if not re.match(r'^[a-zA-Z0-9_\-]+[=<>!~]+[0-9a-zA-Z\.]+', line):
-             if not re.match(r'^[a-zA-Z0-9_\-]+$', line):
-                 errors.append(f"Invalid syntax: {line}")
-    if errors:
-        return f"Validation Failed: {'; '.join(errors)}"
-    logger.info("✅ Requirements validation passed.")
+    
+    # Relaxed validation for generic dependency files
+    # We just check if it has some content and isn't purely whitespace
+    if len(requirements_content.strip()) < 5:
+         return "Error: Content too short to be a valid dependency file."
+         
+    logger.info("✅ Dependency file validation passed (Generic check).")
     return "SUCCESS"
 
 validate_tool = FunctionTool(validate_requirements)

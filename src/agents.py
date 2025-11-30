@@ -5,6 +5,7 @@ Defines Query Creator, Web Search, Web Crawl, and CodeSurgeon agents.
 import sys
 import asyncio
 import json
+from typing import Any
 
 # Fix for Playwright on Windows (NotImplementedError in subprocess)
 if sys.platform == 'win32':
@@ -28,20 +29,20 @@ def create_query_creator_agent():
         name="Query_Creator_Agent",
         model=get_gemini_model(),
         tools=[google_search], # used google_search to avoid conflict with custom tools
-        description="Dependency Detective specialized in diagnosing Python environment conflicts",
+        description="Dependency Detective specialized in diagnosing software environment conflicts",
         instruction="""
-        You are the "Dependency Detective," an expert AI agent specialized in diagnosing Python environment conflicts, legacy code rot, and version mismatch errors.
+        You are the "Dependency Detective," an expert AI agent specialized in diagnosing software environment conflicts, legacy code rot, and version mismatch errors.
         Use Google Search Tool if You don't Know about those issue or packages.
         Use `retrieve_memory` to recall details from previous conversations if the user refers to "last time" or "previous error".
 
         YOUR GOAL:
-        1. Analyze the input to identify the specific packages involved (e.g., "tensorflow", "numpy").
+        1. Analyze the input to identify the specific packages involved (e.g., "tensorflow", "react", "spring-boot").
         2. Save these package names to the session state using `save_context('packages', 'package1, package2')`.
         3. Generate a list of targeted, technical search queries that will help a downstream "Web Crawler" find the exact solution.
 
         INPUT YOU WILL RECEIVE:
-        1. A list of packages (e.g., "tensorflow, keras, numpy").
-        2. An error log or description (e.g., "int32 and float mismatch").
+        1. A list of packages (e.g., "tensorflow, keras" or "react, next.js").
+        2. An error log or description.
 
         YOUR ANALYSIS PROCESS:
         1. Extract the package names and versions from the input.
@@ -59,7 +60,8 @@ def create_query_creator_agent():
         ## Search Queries
         
         Return a raw JSON list of strings in your text response.
-        Example: ["numpy.float deprecated version", "tensorflow 2.x keras version incompatibility"]
+        Return a raw JSON list of strings in your text response.
+        Example: ["numpy.float deprecated version", "react hook dependency warning"]
         """
     )
     logger.info("✅ Query Creator agent created")
@@ -134,6 +136,7 @@ def create_context_search_agent():
         instruction="""
         You are the "Context Researcher".
         
+        YOUR GOAL:
         YOUR GOAL:
         1. Analyze the input search queries to identify the "Main Topic" or "Core Library/Framework" (e.g., if input is "numpy float error", main topic is "numpy").
         2. Search for the Home Page, Main Documentation Hub, or Wikipedia page for this Main Topic.
@@ -232,7 +235,7 @@ def create_code_surgeon_agent():
         name="Code_Surgeon_Agent",
         model=get_model(),
         tools=[retrieve_context_tool, save_context_tool],
-        description="Expert Python developer specialized in dependency resolution",
+        description="Expert Software Developer specialized in dependency resolution",
         instruction="""
         You are the "Code Surgeon".
 
@@ -240,12 +243,12 @@ def create_code_surgeon_agent():
         1. Use 'retrieve_context' to get the 'packages' and 'versions' stored by the Query Creator.
         2. Analyze the dependency conflicts provided by the user.
         3. Based on the research findings from the Web Crawl Agent, determine the correct versions.
-        3. Generate a clean requirements.txt with resolved dependencies.
+        3. Generate a clean dependency configuration file (e.g., requirements.txt, package.json, pom.xml) with resolved dependencies.
         4. Provide an explanation of what was fixed and why.
 
         OUTPUT FORMAT:
         - Clear explanation of the issue
-        - Updated requirements.txt content
+        - Updated dependency file content
         - Migration notes (if breaking changes exist)
         
         IMPORTANT:
@@ -301,6 +304,90 @@ def create_memory_retrieval_agent():
     return agent
 
 
+
+# Triage Agent Definition
+def create_triage_agent():
+    """
+    Creates the Triage agent that decides whether to proceed or ask for more info.
+    """
+    agent = Agent(
+        name="Triage_Agent",
+        model=get_gemini_model(),
+        tools=[], # No tools for Gemini as requested
+        description="Gatekeeper agent that checks if user input has enough context",
+        instruction="""
+        You are the "Triage Agent" for the Package Doctor.
+        
+        YOUR GOAL:
+        Analyze the user's input to determine if it contains enough technical context (package names, error messages, specific problem descriptions) to start a diagnosis.
+        
+        RULES:
+        1. If the input is a Greeting ("Hi", "Hello") or Vague ("Help me", "I have an error", "It's broken"):
+           - Return a response starting with "WAITING:".
+           - Follow it with a polite request for more details.
+           - Example: "WAITING: Hello! I'm the Package Doctor. Could you please provide the `requirements.txt` file or describe the specific error you are facing?"
+           
+        2. If the input has Specific Context ("conflict between numpy and tf", "ImportError in flask", code snippets):
+           - Return a response starting with "PROCEED:".
+           - Follow it with a brief confirmation.
+           - Example: "PROCEED: I see a potential issue with numpy. Let me investigate."
+           
+        3. If the user asks a general question unrelated to dependencies ("What is the weather?"):
+           - Return "WAITING: I specialize in package conflicts. Can I help you with a Python environment issue?"
+        """
+    )
+    logger.info("✅ Triage agent created")
+    return agent
+
+class OrchestratorAgent(Agent):
+    """
+    Custom Agent that orchestrates the flow between Triage and the Resolution Pipeline.
+    """
+    # Declare fields for Pydantic/ADK compatibility
+    triage_agent: Any
+    resolution_pipeline: Any
+
+    def __init__(self, triage_agent, resolution_pipeline, **kwargs):
+        # Initialize with dummy model/tools as we delegate everything
+        # Pass custom fields to super().__init__ so Pydantic validates and sets them
+        super().__init__(
+            model=triage_agent.model, 
+            tools=[], 
+            name="Orchestrator_Agent", 
+            triage_agent=triage_agent,
+            resolution_pipeline=resolution_pipeline,
+            **kwargs
+        )
+        
+    async def run(self, input_str: str, **kwargs):
+        logger.info(f"🎼 Orchestrator received: {input_str}")
+        
+        # 1. Run Triage
+        triage_response = await self.triage_agent.run(input_str, **kwargs)
+        logger.info(f"🚦 Triage decision: {triage_response}")
+        
+        # 2. Parse Decision
+        if "PROCEED:" in triage_response:
+            # Extract the confirmation message if needed, but we mainly want to run the pipeline
+            # We pass the ORIGINAL input to the pipeline so it has full context
+            logger.info("🚀 Triage approved. Running Resolution Pipeline...")
+            
+            # Optional: You could prepend the triage confirmation, but cleaner to just run pipeline
+            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
+            return pipeline_response
+            
+        elif "WAITING:" in triage_response:
+            # Return the question/greeting directly to user
+            clean_response = triage_response.replace("WAITING:", "").strip()
+            return clean_response
+            
+        else:
+            # Fallback if model doesn't follow format (treat as proceed or just return response)
+            # Safest is to return response if it looks like a question, or run pipeline if it looks like a solution.
+            # Let's assume if it didn't say PROCEED, it's a chat response.
+            return triage_response
+
+
 def create_root_agent():
     """
     Creates the root agent that orchestrates the sub-agents.
@@ -336,15 +423,26 @@ def create_root_agent():
     # Code Surgeon (No Loop)
     code_surgeon = create_code_surgeon_agent()
     
-    # Create the sequential agent
+    # Create the sequential pipeline (The "Heavy" Lifters)
     # Flow: Memory -> Research (Query+Search) -> Crawl -> Surgeon
-    agent = SequentialAgent(
-        name="Package_Conflict_Resolver_Root_Agent",
+    resolution_pipeline = SequentialAgent(
+        name="Resolution_Pipeline",
         sub_agents=[memory_agent, web_research_team, web_crawl, code_surgeon],
-        description="Root agent managing the dependency resolution pipeline",
+        description="Sequential pipeline for resolving dependency issues",
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
-    logger.info("✅ Root agent created with sequential flow (Memory -> Research -> Crawl -> Surgeon)")
+    
+    # Create Triage Agent
+    triage_agent = create_triage_agent()
+    
+    # Create Orchestrator
+    agent = OrchestratorAgent(
+        triage_agent=triage_agent,
+        resolution_pipeline=resolution_pipeline,
+        description="Root agent managing the triage and resolution flow"
+    )
+    
+    logger.info("✅ Root agent created with Orchestrator flow (Triage -> [Pipeline])")
     return agent
 
 

@@ -46,7 +46,9 @@ def get_gemini_model():
 
 
 # ===== SESSION SERVICE INITIALIZATION =====
-# Using DatabaseSessionService with SQLite + AsyncIO driver
+# Using LazyDatabaseSessionService to prevent empty sessions on load
+from .lazy_session import LazyDatabaseSessionService
+
 def get_session_service(db_url=None):
     """
     Returns a configured DatabaseSessionService instance.
@@ -60,8 +62,8 @@ def get_session_service(db_url=None):
         # Use legacy_solver.db as it contains the existing sessions
         db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///legacy_solver.db")
         
-    session_service = DatabaseSessionService(db_url=db_url)
-    logger.info(f"✅ Session service initialized: {db_url.split('://')[0]}://...") # Log safe URL
+    session_service = LazyDatabaseSessionService(db_url=db_url)
+    logger.info(f"✅ Session service initialized (Lazy): {db_url.split('://')[0]}://...") # Log safe URL
     return session_service
 
 
