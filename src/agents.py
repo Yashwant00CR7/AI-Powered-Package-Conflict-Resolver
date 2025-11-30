@@ -328,9 +328,8 @@ def create_triage_agent():
            - Example: "WAITING: Hello! I'm the Package Doctor. Could you please provide the `requirements.txt` file or describe the specific error you are facing?"
            
         2. If the input has Specific Context ("conflict between numpy and tf", "ImportError", "ModuleNotFoundError", code snippets, or ANY stack trace):
-           - Return a response starting with "PROCEED:".
-           - Follow it with a brief confirmation.
-           - Example: "PROCEED: I see a potential issue with numpy. Let me investigate."
+           - Return "PROCEED:".
+           - DO NOT add any conversational text after "PROCEED:". The Orchestrator will handle the handoff.
            
         3. If the user asks a general question unrelated to dependencies ("What is the weather?"):
            - Return "WAITING: I specialize in package conflicts. Can I help you with a Python environment issue?"
@@ -357,6 +356,31 @@ class OrchestratorAgent(Agent):
             tools=[], 
             name="Orchestrator_Agent", 
             triage_agent=triage_agent,
+            resolution_pipeline=resolution_pipeline,
+            **kwargs
+        )
+
+    async def run(self, input_str: str, **kwargs):
+        """
+        Orchestrates the flow: Triage -> Resolution Pipeline.
+        """
+        logger.info(f"🤖 Orchestrator received: {input_str}")
+        
+        # 1. Triage
+        triage_response = await self.triage_agent.run(input_str)
+        
+        # 2. Check Decision
+        if "PROCEED:" in triage_response:
+            logger.info("✅ Triage approved. Starting Resolution Pipeline...")
+            return await self.resolution_pipeline.run(input_str)
+        else:
+            logger.info("🛑 Triage waiting for more info.")
+            return triage_response
+
+def create_root_agent():
+    """
+    Creates the root Orchestrator agent.
+    """
     # 1. Memory Retrieval (Separate Agent to avoid Tool Conflict)
     memory_agent = create_memory_retrieval_agent()
 
