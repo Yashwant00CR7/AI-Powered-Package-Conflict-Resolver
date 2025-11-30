@@ -94,13 +94,18 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             meta = self._pending_sessions.pop(session_id)
             
             # Persist the session now!
-            await super().create_session(
+            persisted_session = await super().create_session(
                 session_id=session_id,
                 user_id=meta["user_id"],
                 app_name=meta["app_name"],
                 **meta["kwargs"]
             )
             logger.info(f"💾 Session {session_id} persisted to DB.")
+            
+            # FIX: Update the passed session object with the fresh timestamp from the DB
+            # This prevents "stale session" errors in append_event
+            if hasattr(persisted_session, 'last_update_time'):
+                session.last_update_time = persisted_session.last_update_time
             
         # 2. Append the event (Super)
         await super().append_event(session=session, event=event)
