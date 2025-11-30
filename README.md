@@ -5,26 +5,43 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Google ADK](https://img.shields.io/badge/Google-ADK-4285F4.svg)](https://github.com/google/adk)
 [![MCP Ready](https://img.shields.io/badge/MCP-Ready-green.svg)](https://modelcontextprotocol.io/)
+[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/Yash030/AI-Package-Doctor)
 
-> AI-powered package conflict identifier and resolver using Google's Agent Development Kit (ADK). It leverages a multi-agent architecture with Google Gemini and OpenRouter (Grok) models to diagnose dependency issues, research solutions, and generate fixed configuration files. Now available as a **Model Context Protocol (MCP)** server!
+> **AI-powered package conflict identifier and resolver** using Google's Agent Development Kit (ADK). It leverages a multi-agent architecture with Google Gemini and OpenRouter (Grok) models to diagnose dependency issues, research solutions, and generate fixed configuration files.
+
+<div align="center">
+
+## 🚀 **Try it Live!**
+
+| **Web UI** | **MCP Server Endpoint** |
+| :---: | :---: |
+| [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-sm.svg)](https://huggingface.co/spaces/Yash030/AI-Package-Doctor) | `https://yash030-ai-package-doctor.hf.space/mcp/sse` |
+
+</div>
+
+---
 
 ## 🎯 Features
 
-- **Advanced Multi-Agent Architecture**:
+- **🤖 Advanced Multi-Agent Architecture**:
   - **Context Search Agent**: Retrieves insights from past sessions using Pinecone vector memory.
   - **Parallel Research Team**: Concurrent searching of Official Docs and Community forums.
   - **Web Crawl Agent**: Uses **Firecrawl** (via OpenRouter) for deep web scraping of documentation.
   - **Code Surgeon**: Generates and validates `requirements.txt` fixes.
-- **Hybrid Model Intelligence**:
+
+- **🧠 Hybrid Model Intelligence**:
   - **Google Gemini 2.0 Flash Lite**: For high-speed reasoning and orchestration.
   - **Grok 4.1 Fast (via OpenRouter)**: For specialized web crawling and context analysis.
-- **Model Context Protocol (MCP) Server**:
+
+- **🔌 Model Context Protocol (MCP) Server**:
   - Exposes the agent's capabilities as a standard MCP tool (`solve_dependency_issue`).
   - Connects seamlessly to MCP clients like Claude Desktop or other AI assistants.
-- **Persistent Memory**:
+
+- **💾 Persistent Memory**:
   - **Short-Term**: SQLite/PostgreSQL session storage.
   - **Long-Term**: Pinecone Vector Database for recalling past solutions.
-- **Intelligent Tooling**:
+
+- **🛠️ Intelligent Tooling**:
   - `retrieve_memory`: Semantic search of previous conversations.
   - `google_search`: Live web search.
   - `firecrawl`: Advanced web scraping.
@@ -44,9 +61,15 @@ package_conflict_resolver/
 │   └── utils.py          # Logging & Helpers
 └── ...
 ```
-## Architecture 
 
-![Image](https://github.com/user-attachments/assets/ee299a66-8601-494a-a2ba-d102b036dff2)
+## 🏗️ Architecture
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/ee299a66-8601-494a-a2ba-d102b036dff2" alt="Architecture Diagram" width="800"/>
+  <br>
+  <em>High-level architecture of the Package Conflict Identifier Agent</em>
+</div>
+
 <br>
 
 ## 🚀 Quick Start
@@ -103,7 +126,6 @@ Add the following to your `claude_desktop_config.json`:
   }
 }
 ```
-
 
 Once connected, you can ask Claude:
 > "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
