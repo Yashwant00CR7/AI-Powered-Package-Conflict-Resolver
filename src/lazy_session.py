@@ -56,8 +56,8 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             )
             
         # 2. Check DB (Super)
-        # FIX: DatabaseSessionService.get_session likely only accepts session_id
-        return await super().get_session(session_id)
+        # FIX: Pass session_id as keyword argument
+        return await super().get_session(session_id=session_id)
 
     async def add_message(self, session_id: str, message: types.Content) -> None:
         """
@@ -79,7 +79,7 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             logger.info(f"💾 Session {session_id} persisted to DB.")
             
         # 2. Add the message (Super)
-        await super().add_message(session_id, message)
+        await super().add_message(session_id=session_id, message=message)
 
     async def append_event(self, session: Session, event: Any) -> None:
         """
@@ -103,7 +103,7 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             logger.info(f"💾 Session {session_id} persisted to DB.")
             
         # 2. Append the event (Super)
-        await super().append_event(session, event)
+        await super().append_event(session=session, event=event)
 
     async def list_sessions(self, app_name: str = None, **kwargs) -> List[Session]:
         """
