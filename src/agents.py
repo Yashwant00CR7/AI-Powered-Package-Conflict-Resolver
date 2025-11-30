@@ -14,7 +14,7 @@ if sys.platform == 'win32':
 from google.adk import Agent
 from google.adk.agents import SequentialAgent, ParallelAgent
 # from google.adk.events import Event, EventActions # Unused after removing loop
-from google.adk.tools import google_search, load_memory
+from google.adk.tools import google_search, load_memory, FunctionTool
 from .config import get_model, get_gemini_model
 from .tools import batch_tool, adaptive_tool, save_context_tool, retrieve_context_tool, submit_queries_tool, validate_tool, retrieve_memory_tool
 from .utils import logger
@@ -184,7 +184,7 @@ class WebCrawlAgent(Agent):
             
         # 1. Try Batch Crawl
         logger.info(f"🕷️ Attempting Batch Crawl for {len(urls)} URLs")
-        batch_result = await batch_crawl_tool.func(urls)
+        batch_result = await batch_tool.func(urls)
         
         # 2. Analyze Result (Simple Heuristic)
         # Check if we got valid content
@@ -307,8 +307,8 @@ def create_memory_retrieval_agent():
 
 def create_root_agent():
     """
-    Creates the root agent (Resolution Pipeline).
-    Directly returns the sequential pipeline, bypassing Triage/Orchestrator.
+    Creates the root agent (Manager Agent).
+    Uses the Resolution Pipeline as a TOOL to handle technical requests.
     """
     # 1. Memory Retrieval
     memory_agent = create_memory_retrieval_agent()
@@ -340,7 +340,6 @@ def create_root_agent():
     code_surgeon = create_code_surgeon_agent()
     
     # Create the sequential pipeline (The "Heavy" Lifters)
-    # Flow: Memory -> Research (Query+Search) -> Crawl -> Surgeon
     resolution_pipeline = SequentialAgent(
         name="Resolution_Pipeline",
         sub_agents=[memory_agent, web_research_team, web_crawl, code_surgeon],
@@ -348,8 +347,40 @@ def create_root_agent():
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
     
-    logger.info("✅ Root agent created (Direct Resolution Pipeline)")
-    return resolution_pipeline
+    # --- NEW: Wrap Pipeline as a Tool ---
+    async def run_resolution_job(problem_description: str) -> str:
+        """
+        Triggers the full dependency resolution pipeline.
+        Use this tool when the user describes a technical issue, error, or package conflict.
+        """
+        logger.info(f"🔧 Manager triggering Resolution Pipeline for: {problem_description}")
+        return await resolution_pipeline.run(problem_description)
+
+    resolution_tool = FunctionTool(run_resolution_job)
+
+    # --- NEW: Manager Agent (The Doctor) ---
+    manager_agent = Agent(
+        name="Package_Doctor_Manager",
+        model=get_gemini_model(), # Smart model for decision making
+        tools=[resolution_tool],
+        description="The main interface for the Package Doctor.",
+        instruction="""
+        You are the **Package Doctor**, an expert AI assistant for Python dependency issues.
+
+        YOUR BEHAVIOR:
+        1. **Small Talk**: If the user says "Hello", "Hi", or asks general questions, reply politely and briefly. DO NOT call any tools.
+           - Example: "Hello! I'm ready to help you fix your dependency conflicts. Please share your error log or requirements file."
+
+        2. **Technical Issues**: If the user describes a problem, provides an error log, or mentions package conflicts, **IMMEDIATELY** call the `run_resolution_job` tool.
+           - Pass the user's full description to the tool.
+           - Do not try to solve it yourself without the tool.
+
+        3. **After Tool Execution**: The tool will return the solution. Present it clearly to the user.
+        """
+    )
+    
+    logger.info("✅ Root agent created (Manager with Pipeline Tool)")
+    return manager_agent
 
 
 # ===== MODULE-LEVEL INITIALIZATION FOR ADK WEB =====
