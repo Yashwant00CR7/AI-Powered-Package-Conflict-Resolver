@@ -14,10 +14,14 @@ if sys.platform == 'win32':
 from google.adk import Agent
 from google.adk.agents import SequentialAgent, ParallelAgent
 # from google.adk.events import Event, EventActions # Unused after removing loop
-from google.adk.tools import google_search, load_memory, FunctionTool
+from google.adk.tools import google_search, load_memory, FunctionTool, ToolContext
+from google.adk.agents.invocation_context import InvocationContext
 from .config import get_model, get_gemini_model
 from .tools import batch_tool, adaptive_tool, save_context_tool, retrieve_context_tool, submit_queries_tool, validate_tool, retrieve_memory_tool
 from .utils import logger
+import uuid
+from .config import get_session_service
+from google.adk.agents.run_config import RunConfig
 
 
 def create_query_creator_agent():
@@ -88,9 +92,8 @@ def create_docs_search_agent():
         OUTPUT: Top 4 most relevant OFFICIAL URLs.
         
         OUTPUT FORMAT:
-        **Model: Gemini 2.5 Pro**
-        ## Official Docs Results
-        {"top_urls": ["url1", "url2", ...]}
+        Return ONLY a raw JSON list of URLs. Do not include any markdown formatting, headings, or conversational text.
+        Example: ["https://docs.python.org/3/", "https://pypi.org/project/requests/"]
         """
     )
     logger.info("✅ Docs Search agent created")
@@ -116,9 +119,8 @@ def create_community_search_agent():
         OUTPUT: Top 4 most relevant COMMUNITY URLs.
         
         OUTPUT FORMAT:
-        **Model: Gemini 2.5 Pro**
-        ## Community Results
-        {"top_urls": ["url1", "url2", ...]}
+        Return ONLY a raw JSON list of URLs. Do not include any markdown formatting, headings, or conversational text.
+        Example: ["https://stackoverflow.com/questions/12345", "https://github.com/issues/6789"]
         """
     )
     logger.info("✅ Community Search agent created")
@@ -146,9 +148,8 @@ def create_context_search_agent():
         OUTPUT: Top 3-4 most relevant URLs.
         
         OUTPUT FORMAT:
-        **Model: Gemini 2.5 Pro**
-        ## Context Results
-        {"top_urls": ["url1", "url2", "url3"]}
+        Return ONLY a raw JSON list of URLs. Do not include any markdown formatting, headings, or conversational text.
+        Example: ["https://numpy.org", "https://pypi.org/project/numpy/"]
         """
     )
     logger.info("✅ Context Search agent created")
@@ -174,35 +175,33 @@ class WebCrawlAgent(Agent):
         logger.info(f"🕷️ WebCrawlAgent received input: {input_str}")
         
         # Simple heuristic to extract URLs (assuming input is JSON or list-like string)
-        # In a real scenario, we might use the LLM to parse it first if it's unstructured.
-        # For now, we'll assume the previous agent passed a list of URLs or we can regex them.
         import re
-        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', input_str)
+        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', str(input_str))
         
         if not urls:
             return "No URLs found to crawl."
             
         # 1. Try Batch Crawl
         logger.info(f"🕷️ Attempting Batch Crawl for {len(urls)} URLs")
-        batch_result = await batch_tool.func(urls)
-        
-        # 2. Analyze Result (Simple Heuristic)
-        # Check if we got valid content
-        content = batch_result.get("combined_content", "")
-        
-        # If result contains many "Error" or is very short, we might need adaptive
-        if "Error" not in content and len(content) > 500:
-             return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
-             
-        # 3. Fallback to Adaptive (if batch failed significantly)
-        logger.info("⚠️ Batch crawl had issues. Falling back to Adaptive Crawl for first URL...")
-        # For simplicity in this custom agent, we just try the first URL adaptively as a fallback
-        adaptive_result = await adaptive_tool.func(urls[0], query="dependency conflicts version requirements")
-        
-        # Format adaptive result (it's a dict)
-        formatted_adaptive = json.dumps(adaptive_result, indent=2) if isinstance(adaptive_result, dict) else str(adaptive_result)
-        
-        return f"**Model: Custom Logic (Adaptive Fallback)**\n## Crawled Content Analysis\n\n{formatted_adaptive}"
+        try:
+            batch_result = await batch_tool.func(urls)
+            
+            # 2. Analyze Result (Simple Heuristic)
+            content = batch_result.get("combined_content", "")
+            
+            # If result contains many "Error" or is very short, we might need adaptive
+            if "Error" not in content and len(content) > 500:
+                 return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
+            
+            # 3. Fallback to Adaptive
+            logger.info("⚠️ Batch crawl had issues. Falling back to Adaptive Crawl for first URL...")
+            adaptive_result = await adaptive_tool.func(urls[0], query="dependency conflicts version requirements")
+            formatted_adaptive = json.dumps(adaptive_result, indent=2) if isinstance(adaptive_result, dict) else str(adaptive_result)
+            return f"**Model: Custom Logic (Adaptive Fallback)**\n## Crawled Content Analysis\n\n{formatted_adaptive}"
+            
+        except Exception as e:
+            logger.error(f"❌ WebCrawlAgent Error: {e}")
+            return f"Error during crawling: {str(e)}"
 
 def create_web_crawl_agent():
     """
@@ -292,11 +291,17 @@ def create_memory_retrieval_agent():
         
         YOUR GOAL:
         1. Analyze the user's input (error logs, package names).
-        2. Use `retrieve_memory` to search for similar past resolved sessions.
+        2. Use `retrieve_memory` ONCE to search for similar past resolved sessions.
         3. Summarize any relevant findings.
+        
+        CRITICAL INSTRUCTION:
+        - Call `retrieve_memory` ONLY ONCE.
+        - If the tool returns "No relevant memories found", DO NOT RETRY. Immediately report "No relevant past issues found." and stop.
+        - Do not attempt to rephrase the query and search again.
         
         OUTPUT:
         - If relevant memory found: "Found similar past issue: [Summary]. Solution was: [Solution]"
+        - If NO relevant memory found: "No relevant past issues found."
         - If no memory found: "No relevant past issues found."
         """
     )
@@ -347,40 +352,8 @@ def create_root_agent():
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
     
-    # --- NEW: Wrap Pipeline as a Tool ---
-    async def run_resolution_job(problem_description: str) -> str:
-        """
-        Triggers the full dependency resolution pipeline.
-        Use this tool when the user describes a technical issue, error, or package conflict.
-        """
-        logger.info(f"🔧 Manager triggering Resolution Pipeline for: {problem_description}")
-        return await resolution_pipeline.run_async(problem_description)
-
-    resolution_tool = FunctionTool(run_resolution_job)
-
-    # --- NEW: Manager Agent (The Doctor) ---
-    manager_agent = Agent(
-        name="Package_Doctor_Manager",
-        model=get_gemini_model(), # Smart model for decision making
-        tools=[resolution_tool],
-        description="The main interface for the Package Doctor.",
-        instruction="""
-        You are the **Package Doctor**, an expert AI assistant for Python dependency issues.
-
-        YOUR BEHAVIOR:
-        1. **Small Talk**: If the user says "Hello", "Hi", or asks general questions, reply politely and briefly. DO NOT call any tools.
-           - Example: "Hello! I'm ready to help you fix your dependency conflicts. Please share your error log or requirements file."
-
-        2. **Technical Issues**: If the user describes a problem, provides an error log, or mentions package conflicts, **IMMEDIATELY** call the `run_resolution_job` tool.
-           - Pass the user's full description to the tool.
-           - Do not try to solve it yourself without the tool.
-
-        3. **After Tool Execution**: The tool will return the solution. Present it clearly to the user.
-        """
-    )
-    
-    logger.info("✅ Root agent created (Manager with Pipeline Tool)")
-    return manager_agent
+    logger.info("✅ Root agent created (Resolution Pipeline)")
+    return resolution_pipeline
 
 
 # ===== MODULE-LEVEL INITIALIZATION FOR ADK WEB =====
