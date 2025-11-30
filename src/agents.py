@@ -354,7 +354,7 @@ def create_root_agent():
         Use this tool when the user describes a technical issue, error, or package conflict.
         """
         logger.info(f"🔧 Manager triggering Resolution Pipeline for: {problem_description}")
-        return await resolution_pipeline.run(problem_description)
+        return await resolution_pipeline.run_async(problem_description)
 
     resolution_tool = FunctionTool(run_resolution_job)
 
