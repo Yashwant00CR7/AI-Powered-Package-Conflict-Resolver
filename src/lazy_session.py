@@ -29,31 +29,30 @@ class LazyDatabaseSessionService(DatabaseSessionService):
         }
         
         # Return a temporary Session object (not persisted yet)
-        # We need to mimic what the base class returns
+        # FIX: Session model expects 'id', not 'session_id'. And no 'history'.
         return Session(
-            session_id=session_id,
+            id=session_id,
             user_id=user_id,
-            app_name=app_name,
-            history=[]
+            app_name=app_name
         )
 
-    async def get_session(self, session_id: str) -> Optional[Session]:
+    async def get_session(self, session_id: str, **kwargs) -> Optional[Session]:
         """
         Checks pending sessions first, then falls back to DB.
+        FIX: Added **kwargs to match base signature (which accepts app_name etc.)
         """
         # 1. Check pending
         if session_id in self._pending_sessions:
             meta = self._pending_sessions[session_id]
             # Return a fresh Session object from memory metadata
             return Session(
-                session_id=session_id,
+                id=session_id,
                 user_id=meta["user_id"],
-                app_name=meta["app_name"],
-                history=[]
+                app_name=meta["app_name"]
             )
             
         # 2. Check DB (Super)
-        return await super().get_session(session_id)
+        return await super().get_session(session_id, **kwargs)
 
     async def add_message(self, session_id: str, message: types.Content) -> None:
         """
@@ -77,10 +76,13 @@ class LazyDatabaseSessionService(DatabaseSessionService):
         # 2. Add the message (Super)
         await super().add_message(session_id, message)
 
-    async def list_sessions(self, app_name: str = None, user_id: str = None, limit: int = 10, offset: int = 0) -> List[Session]:
+    async def list_sessions(self, app_name: str = None, **kwargs) -> List[Session]:
         """
         Overrides list_sessions to EXCLUDE pending sessions.
-        This ensures they don't show up in the UI history list.
+        FIX: Updated signature to match base class (likely just app_name or kwargs).
+        The error said "takes 1 positional argument but 5 were given", which implies
+        it might be defined as `list_sessions(self, app_name: str = None)` or similar.
+        Safe bet is to accept kwargs and pass them through.
         """
         # Only return sessions that are actually in the DB
-        return await super().list_sessions(app_name, user_id, limit, offset)
+        return await super().list_sessions(app_name, **kwargs)
