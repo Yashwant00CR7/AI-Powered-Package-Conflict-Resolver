@@ -56,8 +56,12 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             )
             
         # 2. Check DB (Super)
-        # FIX: Pass session_id as keyword argument
-        return await super().get_session(session_id=session_id)
+        # FIX: Pass session_id, app_name, and user_id as keyword arguments
+        return await super().get_session(
+            session_id=session_id,
+            app_name=kwargs.get("app_name"),
+            user_id=kwargs.get("user_id")
+        )
 
     async def add_message(self, session_id: str, message: types.Content) -> None:
         """

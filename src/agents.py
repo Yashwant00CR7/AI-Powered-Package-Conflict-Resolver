@@ -327,13 +327,15 @@ def create_triage_agent():
            - Follow it with a polite request for more details.
            - Example: "WAITING: Hello! I'm the Package Doctor. Could you please provide the `requirements.txt` file or describe the specific error you are facing?"
            
-        2. If the input has Specific Context ("conflict between numpy and tf", "ImportError in flask", code snippets):
+        2. If the input has Specific Context ("conflict between numpy and tf", "ImportError", "ModuleNotFoundError", code snippets, or ANY stack trace):
            - Return a response starting with "PROCEED:".
            - Follow it with a brief confirmation.
            - Example: "PROCEED: I see a potential issue with numpy. Let me investigate."
            
         3. If the user asks a general question unrelated to dependencies ("What is the weather?"):
            - Return "WAITING: I specialize in package conflicts. Can I help you with a Python environment issue?"
+           
+        CRITICAL: If the user pastes an error log, stack trace, or requirements.txt content, ALWAYS return "PROCEED:".
         """
     )
     logger.info("✅ Triage agent created")
@@ -366,26 +368,31 @@ class OrchestratorAgent(Agent):
         triage_response = await self.triage_agent.run(input_str, **kwargs)
         logger.info(f"🚦 Triage decision: {triage_response}")
         
-        # 2. Parse Decision
-        if "PROCEED:" in triage_response:
-            # Extract the confirmation message if needed, but we mainly want to run the pipeline
-            # We pass the ORIGINAL input to the pipeline so it has full context
+        # 2. Parse Decision (Case-insensitive and robust)
+        decision_upper = triage_response.upper()
+        
+        # FORCE TRIGGER: If input is substantial (> 20 chars), IGNORE Triage and run pipeline.
+        # This ensures error logs and descriptions are NEVER blocked.
+        if len(input_str.strip()) > 20:
+            logger.info(f"🚀 Input length ({len(input_str)}) > 20. Forcing Resolution Pipeline (Overriding Triage).")
+            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
+            return pipeline_response
+
+        if "PROCEED" in decision_upper:
             logger.info("🚀 Triage approved. Running Resolution Pipeline...")
-            
-            # Optional: You could prepend the triage confirmation, but cleaner to just run pipeline
             pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
             return pipeline_response
             
-        elif "WAITING:" in triage_response:
+        elif "WAITING" in decision_upper:
             # Return the question/greeting directly to user
-            clean_response = triage_response.replace("WAITING:", "").strip()
+            clean_response = triage_response.replace("WAITING:", "").replace("WAITING", "").strip()
             return clean_response
             
         else:
-            # Fallback if model doesn't follow format (treat as proceed or just return response)
-            # Safest is to return response if it looks like a question, or run pipeline if it looks like a solution.
-            # Let's assume if it didn't say PROCEED, it's a chat response.
-            return triage_response
+            # Fallback: Default to pipeline
+            logger.info("⚠️ Triage format unclear. Defaulting to Resolution Pipeline.")
+            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
+            return pipeline_response
 
 
 def create_root_agent():
