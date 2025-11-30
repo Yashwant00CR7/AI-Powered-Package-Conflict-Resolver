@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from google.adk.memory.base_memory_service import BaseMemoryService, SearchMemoryResponse
 from google.adk.memory.memory_entry import MemoryEntry
@@ -76,6 +77,28 @@ class PineconeMemoryService(BaseMemoryService):
                 logger.warning("⚠️ Session content is empty. Skipping Pinecone save.")
                 return
 
+            # 1.5. Append Solution/Context from State
+            # The Code Surgeon saves the solution to tool_context.state, which maps to session.state
+            if hasattr(session, 'state') and session.state:
+                solution = session.state.get('solution')
+                requirements = session.state.get('requirements')
+                
+                if solution:
+                    logger.info("💡 Found solution in session state. Appending to memory.")
+                    text_content += f"\n\n--- FINAL SOLUTION ---\n{solution}\n"
+                
+                if requirements:
+                    text_content += f"\n\n--- REQUIREMENTS ---\n{requirements}\n"
+            
+            # 1.6. Append Timestamp
+            # Use current time if session.created_at is missing or empty
+            if hasattr(session, 'created_at') and session.created_at:
+                timestamp = str(session.created_at)
+            else:
+                timestamp = datetime.now().isoformat()
+                
+            text_content += f"\n\n--- TIMESTAMP ---\n{timestamp}\n"
+
             # 2. Generate Embedding
             vector = self.model.encode(text_content).tolist()
             
@@ -83,7 +106,7 @@ class PineconeMemoryService(BaseMemoryService):
             metadata = {
                 "session_id": session_id,
                 "text": text_content[:1000], # Store snippet (limit size)
-                "timestamp": str(session.created_at) if hasattr(session, 'created_at') else ""
+                "timestamp": timestamp
             }
             
             # 4. Upsert to Pinecone
