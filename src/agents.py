@@ -357,48 +357,6 @@ class OrchestratorAgent(Agent):
             tools=[], 
             name="Orchestrator_Agent", 
             triage_agent=triage_agent,
-            resolution_pipeline=resolution_pipeline,
-            **kwargs
-        )
-        
-    async def run(self, input_str: str, **kwargs):
-        logger.info(f"🎼 Orchestrator received: {input_str}")
-        
-        # 1. Run Triage
-        triage_response = await self.triage_agent.run(input_str, **kwargs)
-        logger.info(f"🚦 Triage decision: {triage_response}")
-        
-        # 2. Parse Decision (Case-insensitive and robust)
-        decision_upper = triage_response.upper()
-        
-        # FORCE TRIGGER: If input is substantial (> 20 chars), IGNORE Triage and run pipeline.
-        # This ensures error logs and descriptions are NEVER blocked.
-        if len(input_str.strip()) > 20:
-            logger.info(f"🚀 Input length ({len(input_str)}) > 20. Forcing Resolution Pipeline (Overriding Triage).")
-            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
-            return pipeline_response
-
-        if "PROCEED" in decision_upper:
-            logger.info("🚀 Triage approved. Running Resolution Pipeline...")
-            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
-            return pipeline_response
-            
-        elif "WAITING" in decision_upper:
-            # Return the question/greeting directly to user
-            clean_response = triage_response.replace("WAITING:", "").replace("WAITING", "").strip()
-            return clean_response
-            
-        else:
-            # Fallback: Default to pipeline
-            logger.info("⚠️ Triage format unclear. Defaulting to Resolution Pipeline.")
-            pipeline_response = await self.resolution_pipeline.run(input_str, **kwargs)
-            return pipeline_response
-
-
-def create_root_agent():
-    """
-    Creates the root agent that orchestrates the sub-agents.
-    """
     # 1. Memory Retrieval (Separate Agent to avoid Tool Conflict)
     memory_agent = create_memory_retrieval_agent()
 
