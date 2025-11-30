@@ -19,6 +19,10 @@ class LazyDatabaseSessionService(DatabaseSessionService):
         """
         Overrides create_session to store metadata in memory instead of DB.
         """
+        # FIX: Handle None session_id (generate one if missing)
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            
         logger.info(f"💤 Lazy Session Created (Pending): {session_id}")
         
         # Store metadata for later
@@ -86,4 +90,5 @@ class LazyDatabaseSessionService(DatabaseSessionService):
         Safe bet is to accept kwargs and pass them through.
         """
         # Only return sessions that are actually in the DB
-        return await super().list_sessions(app_name, **kwargs)
+        # FIX: Pass app_name as keyword argument to avoid "takes 1 positional argument" error
+        return await super().list_sessions(app_name=app_name, **kwargs)
