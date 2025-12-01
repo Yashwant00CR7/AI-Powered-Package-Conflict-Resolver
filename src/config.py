@@ -46,7 +46,9 @@ def get_gemini_model():
 
 
 # ===== SESSION SERVICE INITIALIZATION =====
-# Using DatabaseSessionService with SQLite + AsyncIO driver
+# Using LazyDatabaseSessionService to prevent empty sessions on load
+from .lazy_session import LazyDatabaseSessionService
+
 def get_session_service(db_url=None):
     """
     Returns a configured DatabaseSessionService instance.
@@ -60,8 +62,8 @@ def get_session_service(db_url=None):
         # Use legacy_solver.db as it contains the existing sessions
         db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///legacy_solver.db")
         
-    session_service = DatabaseSessionService(db_url=db_url)
-    logger.info(f"✅ Session service initialized: {db_url.split('://')[0]}://...") # Log safe URL
+    session_service = LazyDatabaseSessionService(db_url=db_url)
+    logger.info(f"✅ Session service initialized (Lazy): {db_url.split('://')[0]}://...") # Log safe URL
     return session_service
 
 
@@ -69,23 +71,31 @@ def get_session_service(db_url=None):
 # Using InMemoryMemoryService for simplicity (DatabaseMemoryService not available in this ADK version)
 from google.adk.memory import InMemoryMemoryService
 
+# Global cache for memory service
+_memory_service_instance = None
+
 def get_memory_service():
     """
     Returns a configured MemoryService instance.
     Uses Pinecone if PINECONE_API_KEY is set, otherwise InMemory.
+    Implements Singleton pattern to avoid reloading embeddings.
     """
+    global _memory_service_instance
+    if _memory_service_instance:
+        return _memory_service_instance
+
     pinecone_key = os.getenv("PINECONE_API_KEY")
     logger.info(f"🔍 Checking PINECONE_API_KEY: {'Found' if pinecone_key else 'Missing'}")
     
     if pinecone_key:
         try:
             from .memory import PineconeMemoryService
-            memory_service = PineconeMemoryService(api_key=pinecone_key)
+            _memory_service_instance = PineconeMemoryService(api_key=pinecone_key)
             logger.info("✅ Memory service initialized: Pinecone (Long-Term Vector Store)")
-            return memory_service
+            return _memory_service_instance
         except Exception as e:
             logger.error(f"❌ Failed to init Pinecone, falling back to InMemory: {e}")
             
-    memory_service = InMemoryMemoryService()
+    _memory_service_instance = InMemoryMemoryService()
     logger.info("✅ Memory service initialized: InMemory (Ephemeral)")
-    return memory_service
+    return _memory_service_instance
