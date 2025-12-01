@@ -68,6 +68,13 @@ package_conflict_resolver/
 │   ├── agents.py         # Agent Definitions & Workflow
 │   └── utils.py          # Logging & Helpers
 └── ...
+├── src/
+│   ├── combined_server.py # Combined ADK Web UI + MCP Server
+│   ├── config.py         # Configuration & Service Initialization
+│   ├── tools.py          # Custom Tools (Search, Memory, Validation)
+│   ├── agents.py         # Agent Definitions & Workflow
+│   └── utils.py          # Logging & Helpers
+└── ...
 ```
 
 ## 🏗️ Architecture
@@ -109,10 +116,45 @@ python -m src.combined_server
 - **MCP SSE Endpoint**: [http://localhost:7860/mcp/sse](http://localhost:7860/mcp/sse)
 
 **Option B: CLI Mode**
+**Option A: Combined Server (Web UI + MCP) - Recommended**
+This runs both the ADK Developer UI and the MCP Server on the same port.
+```bash
+python -m src.combined_server
+```
+- **Web UI**: [http://localhost:7860/dev-ui/](http://localhost:7860/dev-ui/)
+- **MCP SSE Endpoint**: [http://localhost:7860/mcp/sse](http://localhost:7860/mcp/sse)
+
+**Option B: CLI Mode**
 ```bash
 python main.py
 ```
 
+## 🔌 MCP Server Integration
+
+This agent is deployed as an MCP server, allowing you to use its dependency solving capabilities directly from other AI tools.
+
+### Public Endpoint (Hugging Face Spaces)
+- **SSE URL**: `https://yash030-ai-package-doctor.hf.space/mcp/sse`
+
+### Usage with Claude Desktop
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "AI Package Doctor": {
+      "command": "",
+      "url": "https://yash030-ai-package-doctor.hf.space/mcp/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+Once connected, you can ask Claude:
+> "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
+
+Claude will use the `solve_dependency_issue` tool to analyze the problem using the full power of the agentic workflow.
 ## 🔌 MCP Server Integration
 
 This agent is deployed as an MCP server, allowing you to use its dependency solving capabilities directly from other AI tools.
@@ -167,6 +209,12 @@ The project is configured to run on Hugging Face Spaces (Docker SDK).
 - **Port**: Exposes port `7860`.
 - **Storage**: Uses `/data` directory for persistent storage (if configured with persistent volume).
 
+### Hugging Face Spaces
+The project is configured to run on Hugging Face Spaces (Docker SDK).
+- **Dockerfile**: Included in the root.
+- **Port**: Exposes port `7860`.
+- **Storage**: Uses `/data` directory for persistent storage (if configured with persistent volume).
+
 ### Database
 For production (e.g., Hugging Face Spaces), use a PostgreSQL database:
 ```env
@@ -190,4 +238,5 @@ Built with:
 - [Google Gemini](https://deepmind.google/technologies/gemini/)
 - [OpenRouter](https://openrouter.ai/)
 - [Pinecone](https://www.pinecone.io/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
