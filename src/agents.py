@@ -15,13 +15,10 @@ from google.adk import Agent
 from google.adk.agents import SequentialAgent, ParallelAgent
 # from google.adk.events import Event, EventActions # Unused after removing loop
 from google.adk.tools import google_search, load_memory, FunctionTool, ToolContext
-from google.adk.agents.invocation_context import InvocationContext
 from .config import get_model, get_gemini_model
 from .tools import batch_tool, adaptive_tool, save_context_tool, retrieve_context_tool, submit_queries_tool, validate_tool, retrieve_memory_tool
 from .utils import logger
-import uuid
 from .config import get_session_service
-from google.adk.agents.run_config import RunConfig
 
 
 def create_query_creator_agent():
@@ -64,7 +61,7 @@ def create_query_creator_agent():
         ## Search Queries
         
         Return a raw JSON list of strings in your text response.
-        Return a raw JSON list of strings in your text response.
+
         Example: ["numpy.float deprecated version", "react hook dependency warning"]
         """
     )
@@ -138,7 +135,6 @@ def create_context_search_agent():
         instruction="""
         You are the "Context Researcher".
         
-        YOUR GOAL:
         YOUR GOAL:
         1. Analyze the input search queries to identify the "Main Topic" or "Core Library/Framework" (e.g., if input is "numpy float error", main topic is "numpy").
         2. Search for the Home Page, Main Documentation Hub, or Wikipedia page for this Main Topic.
@@ -241,7 +237,7 @@ def create_code_surgeon_agent():
         1. Use 'retrieve_context' to get the 'packages' and 'versions' stored by the Query Creator.
         2. Analyze the dependency conflicts provided by the user.
         3. Based on the research findings from the Web Crawl Agent, determine the correct versions.
-        3. Generate a clean dependency configuration file (e.g., requirements.txt, package.json, pom.xml) with resolved dependencies.
+        4. Generate a clean dependency configuration file (e.g., requirements.txt, package.json, pom.xml) with resolved dependencies.
         4. Provide an explanation of what was fixed and why.
 
         OUTPUT FORMAT:
