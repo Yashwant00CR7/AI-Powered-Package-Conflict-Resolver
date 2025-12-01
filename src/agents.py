@@ -27,7 +27,7 @@ def create_query_creator_agent():
     agent = Agent(
         name="Query_Creator_Agent",
         model=get_gemini_model(),
-        tools=[google_search], # used google_search to avoid conflict with custom tools
+        tools=[google_search], # Removed google_search to avoid conflict with custom tools
         description="Dependency Detective specialized in diagnosing Python environment conflicts",
         instruction="""
         You are the "Dependency Detective," an expert AI agent specialized in diagnosing Python environment conflicts, legacy code rot, and version mismatch errors.
@@ -181,7 +181,8 @@ class WebCrawlAgent(Agent):
             
         # 1. Try Batch Crawl
         logger.info(f"🕷️ Attempting Batch Crawl for {len(urls)} URLs")
-        batch_result = await batch_crawl_tool.func(urls)
+        # FIXED: Use batch_tool instead of batch_crawl_tool (NameError fix)
+        batch_result = await batch_tool.func(urls)
         
         # 2. Analyze Result (Simple Heuristic)
         # Check if we got valid content
@@ -206,12 +207,10 @@ def create_web_crawl_agent():
     Creates the Web Crawl agent (Content Extractor).
     Now uses the Custom WebCrawlAgent class.
     """
-    # We pass tools=[] to the parent Agent so the LLM doesn't see them and try to call them.
-    # The custom run() method will use the tools directly.
     agent = WebCrawlAgent(
         name="Web_Crawl_Agent",
         model=get_model(),
-        tools=[], # HIDE TOOLS FROM LLM to prevent hallucinated/parallel calls
+        tools=[batch_tool, adaptive_tool],
         description="Technical Content Extractor using Deterministic Logic",
         instruction="""
         You are the "Technical Content Extractor".
@@ -274,41 +273,11 @@ async def auto_save_to_memory(callback_context):
         logger.error(f"❌ Failed to auto-save session: {e}")
 
 
-def create_memory_retrieval_agent():
-    """
-    Creates the Memory Retrieval agent.
-    Checks past sessions for similar issues.
-    """
-    agent = Agent(
-        name="Memory_Retrieval_Agent",
-        model=get_model(), # Use Grok or Gemini (Grok is fine for retrieval)
-        tools=[retrieve_memory_tool],
-        description="Agent that searches long-term memory for past solutions",
-        instruction="""
-        You are the "Memory Specialist".
-        
-        YOUR GOAL:
-        1. Analyze the user's input (error logs, package names).
-        2. Use `retrieve_memory` to search for similar past resolved sessions.
-        3. Summarize any relevant findings.
-        
-        OUTPUT:
-        - If relevant memory found: "Found similar past issue: [Summary]. Solution was: [Solution]"
-        - If no memory found: "No relevant past issues found."
-        """
-    )
-    logger.info("✅ Memory Retrieval agent created")
-    return agent
-
-
 def create_root_agent():
     """
     Creates the root agent that orchestrates the sub-agents.
     """
-    # 1. Memory Retrieval (Separate Agent to avoid Tool Conflict)
-    memory_agent = create_memory_retrieval_agent()
-
-    # 2. Research Team
+    # Create sub-agents
     query_creator = create_query_creator_agent()
     # load_memory removed due to model limitations
     
@@ -331,20 +300,19 @@ def create_root_agent():
     )
     
     web_crawl = create_web_crawl_agent()
-    # web_crawl = create_web_crawl_agent() # Duplicate removed
+    # Duplicate removed
     
     # Code Surgeon (No Loop)
     code_surgeon = create_code_surgeon_agent()
     
     # Create the sequential agent
-    # Flow: Memory -> Research (Query+Search) -> Crawl -> Surgeon
     agent = SequentialAgent(
         name="Package_Conflict_Resolver_Root_Agent",
-        sub_agents=[memory_agent, web_research_team, web_crawl, code_surgeon],
+        sub_agents=[web_research_team, web_crawl, code_surgeon],
         description="Root agent managing the dependency resolution pipeline",
         after_agent_callback=auto_save_to_memory # Auto-save history
     )
-    logger.info("✅ Root agent created with sequential flow (Memory -> Research -> Crawl -> Surgeon)")
+    logger.info("✅ Root agent created with sequential flow (Research Team -> Crawl -> Surgeon)")
     return agent
 
 

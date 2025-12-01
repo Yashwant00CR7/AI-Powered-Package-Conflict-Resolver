@@ -12,23 +12,44 @@ pinned: false
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Google ADK](https://img.shields.io/badge/Google-ADK-4285F4.svg)](https://github.com/google/adk)
+[![MCP Ready](https://img.shields.io/badge/MCP-Ready-green.svg)](https://modelcontextprotocol.io/)
+[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/Yash030/AI-Package-Doctor)
 
-> AI-powered package conflict identifier and resolver using Google's Agent Development Kit (ADK). It leverages a multi-agent architecture with Google Gemini and OpenRouter (Grok) models to diagnose dependency issues, research solutions, and generate fixed configuration files.
+> **AI-powered package conflict identifier and resolver** using Google's Agent Development Kit (ADK). It leverages a multi-agent architecture with Google Gemini and OpenRouter (Grok) models to diagnose dependency issues, research solutions, and generate fixed configuration files.
+
+<div align="center">
+
+## 🚀 **Try it Live!**
+
+| **Web UI** | **MCP Server Endpoint** |
+| :---: | :---: |
+| [![Open in Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-sm.svg)](https://huggingface.co/spaces/Yash030/AI-Package-Doctor) | `https://yash030-ai-package-doctor.hf.space/mcp/sse` |
+
+</div>
+
+---
 
 ## 🎯 Features
 
-- **Advanced Multi-Agent Architecture**:
+- **🤖 Advanced Multi-Agent Architecture**:
   - **Context Search Agent**: Retrieves insights from past sessions using Pinecone vector memory.
   - **Parallel Research Team**: Concurrent searching of Official Docs and Community forums.
   - **Web Crawl Agent**: Uses **Firecrawl** (via OpenRouter) for deep web scraping of documentation.
   - **Code Surgeon**: Generates and validates `requirements.txt` fixes.
-- **Hybrid Model Intelligence**:
+
+- **🧠 Hybrid Model Intelligence**:
   - **Google Gemini 2.0 Flash Lite**: For high-speed reasoning and orchestration.
   - **Grok 4.1 Fast (via OpenRouter)**: For specialized web crawling and context analysis.
-- **Persistent Memory**:
+
+- **🔌 Model Context Protocol (MCP) Server**:
+  - Exposes the agent's capabilities as a standard MCP tool (`solve_dependency_issue`).
+  - Connects seamlessly to MCP clients like Claude Desktop or other AI assistants.
+
+- **💾 Persistent Memory**:
   - **Short-Term**: SQLite/PostgreSQL session storage.
   - **Long-Term**: Pinecone Vector Database for recalling past solutions.
-- **Intelligent Tooling**:
+
+- **🛠️ Intelligent Tooling**:
   - `retrieve_memory`: Semantic search of previous conversations.
   - `google_search`: Live web search.
   - `firecrawl`: Advanced web scraping.
@@ -40,14 +61,24 @@ package_conflict_resolver/
 ├── .env                  # Environment variables (API Keys)
 ├── requirements.txt      # Dependencies
 ├── main.py               # CLI Entry Point
-├── web_app.py            # Web UI Entry Point (ADK Web Server)
-└── src/
-    ├── __init__.py
-    ├── config.py         # Configuration & Service Initialization
-    ├── tools.py          # Custom Tools (Search, Memory, Validation)
-    ├── agents.py         # Agent Definitions & Workflow
-    └── utils.py          # Logging & Helpers
+├── src/
+│   ├── combined_server.py # Combined ADK Web UI + MCP Server
+│   ├── config.py         # Configuration & Service Initialization
+│   ├── tools.py          # Custom Tools (Search, Memory, Validation)
+│   ├── agents.py         # Agent Definitions & Workflow
+│   └── utils.py          # Logging & Helpers
+└── ...
 ```
+
+## 🏗️ Architecture
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/ee299a66-8601-494a-a2ba-d102b036dff2" alt="Architecture Diagram" width="800"/>
+  <br>
+  <em>High-level architecture of the Package Conflict Identifier Agent</em>
+</div>
+
+<br>
 
 ## 🚀 Quick Start
 
@@ -69,16 +100,45 @@ DATABASE_URL=sqlite+aiosqlite:///legacy_solver.db
 
 ### 3. Run the Agent
 
-**Option A: CLI Mode (Recommended for quick tasks)**
+**Option A: Combined Server (Web UI + MCP) - Recommended**
+This runs both the ADK Developer UI and the MCP Server on the same port.
+```bash
+python -m src.combined_server
+```
+- **Web UI**: [http://localhost:7860/dev-ui/](http://localhost:7860/dev-ui/)
+- **MCP SSE Endpoint**: [http://localhost:7860/mcp/sse](http://localhost:7860/mcp/sse)
+
+**Option B: CLI Mode**
 ```bash
 python main.py
 ```
 
-**Option B: Web UI (Full Experience)**
-```bash
-adk web --no-reload
+## 🔌 MCP Server Integration
+
+This agent is deployed as an MCP server, allowing you to use its dependency solving capabilities directly from other AI tools.
+
+### Public Endpoint (Hugging Face Spaces)
+- **SSE URL**: `https://yash030-ai-package-doctor.hf.space/mcp/sse`
+
+### Usage with Claude Desktop
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "AI Package Doctor": {
+      "command": "",
+      "url": "https://yash030-ai-package-doctor.hf.space/mcp/sse",
+      "transport": "sse"
+    }
+  }
+}
 ```
-Open [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) to interact with the agent visually and view chat history.
+
+Once connected, you can ask Claude:
+> "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
+
+Claude will use the `solve_dependency_issue` tool to analyze the problem using the full power of the agentic workflow.
 
 ## 🤖 Agent Workflow
 
@@ -100,6 +160,12 @@ Open [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) to interact 
     - Generates a corrected `requirements.txt` or solution plan.
 
 ## ☁️ Deployment & Persistence
+
+### Hugging Face Spaces
+The project is configured to run on Hugging Face Spaces (Docker SDK).
+- **Dockerfile**: Included in the root.
+- **Port**: Exposes port `7860`.
+- **Storage**: Uses `/data` directory for persistent storage (if configured with persistent volume).
 
 ### Database
 For production (e.g., Hugging Face Spaces), use a PostgreSQL database:
@@ -124,3 +190,4 @@ Built with:
 - [Google Gemini](https://deepmind.google/technologies/gemini/)
 - [OpenRouter](https://openrouter.ai/)
 - [Pinecone](https://www.pinecone.io/)
+- [Model Context Protocol](https://modelcontextprotocol.io/)
