@@ -193,23 +193,9 @@ class WebCrawlAgent(Agent):
         # FIXED: Use batch_tool instead of batch_crawl_tool (NameError fix)
         batch_result = await batch_tool.func(urls)
         
-        # 2. Analyze Result (Simple Heuristic)
-        # Check if we got valid content
+        # 2. Return Result Directly (Batch Only)
         content = batch_result.get("combined_content", "")
-        
-        # If result contains many "Error" or is very short, we might need adaptive
-        if "Error" not in content and len(content) > 500:
-             return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
-             
-        # 3. Fallback to Adaptive (if batch failed significantly)
-        logger.info("⚠️ Batch crawl had issues. Falling back to Adaptive Crawl for first URL...")
-        # For simplicity in this custom agent, we just try the first URL adaptively as a fallback
-        adaptive_result = await adaptive_tool.func(urls[0], query="dependency conflicts version requirements")
-        
-        # Format adaptive result (it's a dict)
-        formatted_adaptive = json.dumps(adaptive_result, indent=2) if isinstance(adaptive_result, dict) else str(adaptive_result)
-        
-        return f"**Model: Custom Logic (Adaptive Fallback)**\n## Crawled Content Analysis\n\n{formatted_adaptive}"
+        return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
 
 def create_web_crawl_agent():
     """
