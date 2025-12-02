@@ -222,21 +222,30 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 # We need to manage the SSE transport manually using raw ASGI routes
 sse_transport = SseServerTransport("/mcp/messages")
 
-async def sse_handler(scope, receive, send):
+async def handle_sse(request: Request):
     """
-    ASGI handler for SSE endpoint.
+    Handler for SSE endpoint.
+    Returns an ASGI app that manages the connection.
     """
-    async with sse_transport.connect_sse(scope, receive, send) as (read_stream, write_stream):
-        await mcp_server.run(
-            read_stream,
-            write_stream,
-            mcp_server.create_initialization_options()
-        )
+    async def sse_asgi_app(scope, receive, send):
+        async with sse_transport.connect_sse(scope, receive, send) as (read_stream, write_stream):
+            await mcp_server.run(
+                read_stream,
+                write_stream,
+                mcp_server.create_initialization_options()
+            )
+    return sse_asgi_app
+
+async def handle_messages(request: Request):
+    """
+    Handler for Messages endpoint.
+    Returns the ASGI app from sse_transport.
+    """
+    return sse_transport.handle_post_message
 
 # Add routes directly to the FastAPI app
-# Note: We pass the ASGI apps directly, not wrapper functions that return them.
-app.add_route("/mcp/sse", sse_handler, methods=["GET"])
-app.add_route("/mcp/messages", sse_transport.handle_post_message, methods=["POST"])
+app.add_route("/mcp/sse", handle_sse, methods=["GET"])
+app.add_route("/mcp/messages", handle_messages, methods=["POST"])
 
 from fastapi.responses import RedirectResponse
 
