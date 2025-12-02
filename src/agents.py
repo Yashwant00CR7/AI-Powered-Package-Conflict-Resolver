@@ -177,6 +177,17 @@ class WebCrawlAgent(Agent):
         if not urls:
             return "No URLs found to crawl."
             
+        # Deduplicate URLs while preserving order
+        seen = set()
+        unique_urls = []
+        for url in urls:
+            if url not in seen:
+                unique_urls.append(url)
+                seen.add(url)
+        urls = unique_urls
+        
+        logger.info(f"🕷️ WebCrawlAgent Deduplicated URLs: {urls}")
+            
         # 1. Try Batch Crawl
         logger.info(f"🕷️ Attempting Batch Crawl for {len(urls)} URLs")
         # FIXED: Use batch_tool instead of batch_crawl_tool (NameError fix)
