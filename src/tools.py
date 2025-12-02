@@ -21,40 +21,46 @@ class SearchResult(BaseModel):
 
 # --- 2. Worker Functions (Run in Subprocess) ---
 
-def _run_batch_crawl_worker(urls: List[str]) -> Dict[str, Any]:
+
+async def batch_crawl_tool(urls: List[str]) -> Dict[str, Any]:
     """
-    Worker function to run batch crawl in a separate process.
+    Crawls a LIST of URLs in one go using AsyncWebCrawler directly.
     """
-    # Enforce ProactorEventLoop on Windows for Playwright
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        
-    async def _async_logic():
-        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-        
-        # Shared Config
-        browser_config = BrowserConfig(
-            headless=True,
-            ignore_https_errors=True,
-            extra_args=["--ignore-certificate-errors", "--ignore-ssl-errors"]
-        )
-        run_config = CrawlerRunConfig(
-            cache_mode=CacheMode.BYPASS,
-            word_count_threshold=10,
-        )
-        
-        results = []
-        # limit to top 3
-        target_urls = urls[:3]
-        
+    logger.info(f"🚀 Batch Tool Triggered: Processing {len(urls)} URLs...")
+    
+    # Import here to avoid top-level dependency if not needed immediately
+    from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+    
+    # Shared Config
+    browser_config = BrowserConfig(
+        headless=True,
+        ignore_https_errors=True,
+        extra_args=["--ignore-certificate-errors", "--ignore-ssl-errors"]
+    )
+    run_config = CrawlerRunConfig(
+        cache_mode=CacheMode.BYPASS,
+        word_count_threshold=10,
+    )
+    
+    results = []
+    # limit to top 3
+    target_urls = urls[:3]
+    
+    try:
         async with AsyncWebCrawler(config=browser_config) as crawler:
             for url in target_urls:
                 try:
-                    crawl_result = await crawler.arun(url=url, config=run_config)
+                    # Add timeout for each URL
+                    crawl_result = await asyncio.wait_for(
+                        crawler.arun(url=url, config=run_config),
+                        timeout=30.0
+                    )
                     if crawl_result.success:
                         results.append(f"--- SOURCE: {url} ---\n{crawl_result.markdown[:15000]}\n")
                     else:
                         results.append(f"--- SOURCE: {url} ---\n[Error: Failed to crawl]\n")
+                except asyncio.TimeoutError:
+                    results.append(f"--- SOURCE: {url} ---\n[Error: Timeout]\n")
                 except Exception as e:
                     results.append(f"--- SOURCE: {url} ---\n[Exception: {str(e)}]\n")
                     
@@ -62,28 +68,28 @@ def _run_batch_crawl_worker(urls: List[str]) -> Dict[str, Any]:
             "combined_content": "\n".join(results),
             "status": "completed"
         }
+    except Exception as e:
+        logger.error(f"❌ Batch crawl failed: {e}")
+        return {"combined_content": f"Error: {str(e)}", "status": "failed"}
 
-    return asyncio.run(_async_logic())
-
-
-def _run_adaptive_crawl_worker(start_url: str, user_query: str) -> Dict[str, Any]:
+async def adaptive_crawl_tool(start_url: str, user_query: str) -> Dict[str, Any]:
     """
-    Worker function to run adaptive crawl in a separate process.
+    Performs adaptive crawl using AsyncWebCrawler directly.
     """
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        
-    async def _async_logic():
-        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, AdaptiveConfig, LLMConfig
-        from crawl4ai.extraction_strategy import LLMExtractionStrategy
-        
-        browser_config = BrowserConfig(
-            headless=True,
-            verbose=True,
-            ignore_https_errors=True,
-            extra_args=["--ignore-certificate-errors", "--ignore-ssl-errors"]
-        )
-        
+    logger.info(f"🛠️ Tool Triggered: Adaptive Crawl on {start_url}")
+    
+    from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode, AdaptiveConfig, LLMConfig
+    from crawl4ai.extraction_strategy import LLMExtractionStrategy
+    from crawl4ai import AdaptiveCrawler
+    
+    browser_config = BrowserConfig(
+        headless=True,
+        verbose=True,
+        ignore_https_errors=True,
+        extra_args=["--ignore-certificate-errors", "--ignore-ssl-errors"]
+    )
+    
+    try:
         async with AsyncWebCrawler(config=browser_config) as crawler:
             # Phase 1: Discovery
             adaptive_config = AdaptiveConfig(
@@ -92,8 +98,6 @@ def _run_adaptive_crawl_worker(start_url: str, user_query: str) -> Dict[str, Any
                 top_k_links=2,
             )
             
-            # Import inside function to avoid top-level import issues in subprocess if needed
-            from crawl4ai import AdaptiveCrawler
             adaptive = AdaptiveCrawler(crawler, config=adaptive_config)
             
             try:
@@ -134,41 +138,10 @@ def _run_adaptive_crawl_worker(start_url: str, user_query: str) -> Dict[str, Any
                 return {"raw_output": result.extracted_content}
             except Exception as e:
                 return {"error": f"Extraction failed: {str(e)}"}
-
-    return asyncio.run(_async_logic())
-
-
-# --- 3. Main Tools (Async Wrappers) ---
-
-async def batch_crawl_tool(urls: List[str]) -> Dict[str, Any]:
-    """
-    Crawls a LIST of URLs in one go using a subprocess to ensure correct event loop.
-    """
-    logger.info(f"🚀 Batch Tool Triggered: Processing {len(urls)} URLs...")
-    
-    loop = asyncio.get_running_loop()
-    with concurrent.futures.ProcessPoolExecutor() as pool:
-        try:
-            result = await loop.run_in_executor(pool, _run_batch_crawl_worker, urls)
-            return result
-        except Exception as e:
-            logger.error(f"❌ Batch crawl subprocess failed: {e}")
-            return {"combined_content": f"Error: {str(e)}", "status": "failed"}
-
-async def adaptive_crawl_tool(start_url: str, user_query: str) -> Dict[str, Any]:
-    """
-    Performs adaptive crawl using a subprocess.
-    """
-    logger.info(f"🛠️ Tool Triggered: Adaptive Crawl on {start_url}")
-    
-    loop = asyncio.get_running_loop()
-    with concurrent.futures.ProcessPoolExecutor() as pool:
-        try:
-            result = await loop.run_in_executor(pool, _run_adaptive_crawl_worker, start_url, user_query)
-            return result
-        except Exception as e:
-            logger.error(f"❌ Adaptive crawl subprocess failed: {e}")
-            return {"error": f"Subprocess failed: {str(e)}"}
+                
+    except Exception as e:
+        logger.error(f"❌ Adaptive crawl failed: {e}")
+        return {"error": f"Crawl failed: {str(e)}"}
 
 
 # Convert to ADK Tools
