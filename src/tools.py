@@ -179,22 +179,25 @@ adaptive_tool = FunctionTool(adaptive_crawl_tool)
 # ===== STATE MANAGEMENT TOOLS =====
 from google.adk.tools import ToolContext
 
+# Global state dictionary for persistence across agents
+GLOBAL_STATE = {}
+
 def save_context(tool_context: ToolContext, key: str, value: str) -> str:
-    tool_context.state[key] = value
-    logger.info(f"💾 State Saved: {key} = {value}")
+    GLOBAL_STATE[key] = value
+    logger.info(f"💾 State Saved (Global): {key} = {value}")
     return f"Saved {key} to state."
 
 def retrieve_context(tool_context: ToolContext, key: str) -> str:
-    value = tool_context.state.get(key, "Not found")
-    logger.info(f"📂 State Retrieved: {key} = {value}")
+    value = GLOBAL_STATE.get(key, "Not found")
+    logger.info(f"📂 State Retrieved (Global): {key} = {value}")
     return str(value)
 
 save_context_tool = FunctionTool(save_context)
 retrieve_context_tool = FunctionTool(retrieve_context)
 
 def submit_queries(tool_context: ToolContext, queries: List[str]) -> str:
-    tool_context.state['search_queries'] = queries
-    logger.info(f"🚀 Queries Submitted: {queries}")
+    GLOBAL_STATE['search_queries'] = queries
+    logger.info(f"🚀 Queries Submitted (Global): {queries}")
     return "Queries submitted successfully."
 
 submit_queries_tool = FunctionTool(submit_queries)
