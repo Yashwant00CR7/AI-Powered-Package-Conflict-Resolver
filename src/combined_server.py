@@ -3,6 +3,11 @@ Combined Server for AI-Package-Doctor.
 Runs both the ADK Web UI and the MCP Server on the same FastAPI app.
 """
 import os
+import sys
+
+# Add project root to sys.path to allow imports from src
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import uvicorn
 import nest_asyncio
 from fastapi import FastAPI, Request
@@ -175,15 +180,21 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
                 )
 
                 for event in response_generator:
-                    if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
-                        if event.content.parts:
-                            text = event.content.parts[0].text
-                            if text and text != "None":
-                                response_text += text
-                    elif hasattr(event, 'text'):
-                        response_text += event.text
-                    elif isinstance(event, str):
-                        response_text += event
+                    # Log event author for debugging
+                    author = getattr(event, 'author', 'unknown')
+                    logger.info(f"📨 Event received from: {author}")
+
+                    # FILTER: Only return output from the final agent (Code_Surgeon_Agent)
+                    if author == "Code_Surgeon_Agent":
+                        if hasattr(event, 'content') and event.content and hasattr(event.content, 'parts'):
+                            if event.content.parts:
+                                text = event.content.parts[0].text
+                                if text and text != "None":
+                                    response_text += text
+                        elif hasattr(event, 'text'):
+                            response_text += event.text
+                        elif isinstance(event, str):
+                            response_text += event
 
                 logger.info(f"✅ Agent completed. Response length: {len(response_text)} chars")
                 

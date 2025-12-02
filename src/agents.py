@@ -29,7 +29,7 @@ def create_query_creator_agent():
     agent = Agent(
         name="Query_Creator_Agent",
         model=get_gemini_model(),
-        tools=[google_search], # Removed google_search to avoid conflict with custom tools
+        tools=[save_context_tool, retrieve_memory_tool], # Removed google_search to avoid conflict with functional tools
         description="Dependency Detective specialized in diagnosing Python environment conflicts",
         instruction="""
         You are the "Dependency Detective," an expert AI agent specialized in diagnosing software environment conflicts, legacy code rot, and version mismatch errors.
