@@ -4,6 +4,12 @@ Runs both the ADK Web UI and the MCP Server on the same FastAPI app.
 """
 import os
 import sys
+import asyncio
+
+# CRITICAL: Set event loop policy BEFORE any other imports
+# Fix for Playwright on Windows with nest_asyncio
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Add project root to sys.path to allow imports from src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
