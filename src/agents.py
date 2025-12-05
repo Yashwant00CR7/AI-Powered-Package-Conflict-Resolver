@@ -8,8 +8,9 @@ import json
 from typing import Any
 
 # Fix for Playwright on Windows (NotImplementedError in subprocess)
+# Use SelectorEventLoop instead of ProactorEventLoop for compatibility with nest_asyncio
 if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from google.adk import Agent
 from google.adk.agents import SequentialAgent, ParallelAgent
@@ -170,32 +171,69 @@ class WebCrawlAgent(Agent):
         """
         logger.info(f"🕷️ WebCrawlAgent received input: {input_str}")
         
-        # Simple heuristic to extract URLs (assuming input is JSON or list-like string)
+        # Try to parse as JSON first (in case it's a JSON array/object)
         import re
-        urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', str(input_str))
+        import json
+        
+        urls = []
+        
+        # Attempt 1: Parse as JSON array
+        try:
+            parsed = json.loads(input_str)
+            if isinstance(parsed, list):
+                urls = [url for url in parsed if isinstance(url, str) and url.startswith('http')]
+                logger.info(f"🕷️ Extracted URLs from JSON array: {urls}")
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        # Attempt 2: Extract from JSON-like structures in text
+        if not urls:
+            # Find JSON arrays in the text
+            json_arrays = re.findall(r'\[([^\]]+)\]', input_str)
+            for json_array in json_arrays:
+                try:
+                    # Try to parse the array content
+                    parsed = json.loads(f'[{json_array}]')
+                    if isinstance(parsed, list):
+                        urls.extend([url for url in parsed if isinstance(url, str) and url.startswith('http')])
+                except:
+                    pass
+        
+        # Attempt 3: Regex extraction (fallback)
+        if not urls:
+            urls = re.findall(r'https?://[^\s<>"\'\)\],]+', str(input_str))
+            logger.info(f"🕷️ Extracted URLs via regex: {urls}")
         
         if not urls:
-            return "No URLs found to crawl."
+            logger.warning(f"⚠️ No URLs found in input. Input snippet: {input_str[:200]}")
+            return "No URLs found to crawl. Please provide URLs from the search results."
             
         # Deduplicate URLs while preserving order
         seen = set()
         unique_urls = []
         for url in urls:
-            if url not in seen:
+            # Clean the URL (remove trailing quotes, commas, etc.)
+            url = url.rstrip('",\'')
+            if url not in seen and url.startswith('http'):
                 unique_urls.append(url)
                 seen.add(url)
         urls = unique_urls
         
-        logger.info(f"🕷️ WebCrawlAgent Deduplicated URLs: {urls}")
+        logger.info(f"🕷️ WebCrawlAgent Deduplicated URLs ({len(urls)}): {urls}")
+        
+        # Limit to top 5 URLs to prevent excessive crawling
+        if len(urls) > 5:
+            logger.info(f"⚠️ Too many URLs ({len(urls)}). Limiting to top 5.")
+            urls = urls[:5]
             
         # 1. Try Batch Crawl
         logger.info(f"🕷️ Attempting Batch Crawl for {len(urls)} URLs")
-        # FIXED: Use batch_tool instead of batch_crawl_tool (NameError fix)
         batch_result = await batch_tool.func(urls)
         
         # 2. Return Result Directly (Batch Only)
         content = batch_result.get("combined_content", "")
         return f"**Model: Custom Logic**\n## Crawled Content Analysis\n\n{content}"
+
 
 def create_web_crawl_agent():
     """

@@ -26,11 +26,11 @@ def get_model():
     os.environ["OPENAI_API_BASE"] = "https://openrouter.ai/api/v1"
     os.environ["OPENAI_API_KEY"] = os.getenv("OPENROUTER_API_KEY")
     
-    # Use the requested Grok model
+    # Use GLM 4.5 Air - free tier optimized for speed with function calling
     # LiteLLM uses 'openai/' prefix for OpenAI-compatible endpoints
-    model = LiteLlm(model="openai/x-ai/grok-4.1-fast:free")
+    model = LiteLlm(model="openai/z-ai/glm-4.5-air:free")
     
-    logger.info("✅ Model initialized: x-ai/grok-4.1-fast:free via OpenRouter")
+    logger.info("✅ Model initialized: z-ai/glm-4.5-air:free via OpenRouter")
     return model
 
 
