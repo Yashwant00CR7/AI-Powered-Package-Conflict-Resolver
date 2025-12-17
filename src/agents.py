@@ -10,10 +10,11 @@ from typing import Any
 # Fix for Playwright on Windows (NotImplementedError in subprocess)
 # Use SelectorEventLoop instead of ProactorEventLoop for compatibility with nest_asyncio
 if sys.platform == 'win32':
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 
 from google.adk import Agent
-from google.adk.agents import SequentialAgent, ParallelAgent
+from google.adk.agents import SequentialAgent
 # from google.adk.events import Event, EventActions # Unused after removing loop
 from google.adk.tools import google_search, load_memory, FunctionTool, ToolContext
 from .config import get_model, get_gemini_model
@@ -319,10 +320,11 @@ def create_root_agent():
     context_search = create_context_search_agent()
     
     # Parallel Research
-    parallel_search = ParallelAgent(
+    # Changed to SequentialAgent to avoid Gemini 429 (Too Many Requests) errors
+    parallel_search = SequentialAgent(
         name="Parallel_Search_Team",
         sub_agents=[docs_search, community_search, context_search],
-        description="Parallel search for official, community, and general context resources"
+        description="Sequential search for official, community, and general context resources"
     )
     
     # Group Research Team
@@ -350,8 +352,10 @@ def create_root_agent():
 
 
 # ===== MODULE-LEVEL INITIALIZATION FOR ADK WEB =====
-root_agent = create_root_agent()
+# Removed to prevent immediate execution on import (fixes 429 quota issues)
+# root_agent = create_root_agent() # DEPRECATED
+# agent = root_agent # DEPRECATED
 
-# Removed App definition to avoid ImportError. 
-# Memory is handled via global_memory_service in callback.
-agent = root_agent
+# If needed for backward compatibility with ADK cli that imports 'agent'
+# We should load it lazily or require the caller to call create_root_agent()
+
