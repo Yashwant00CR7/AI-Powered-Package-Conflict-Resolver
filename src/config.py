@@ -37,11 +37,23 @@ def get_model():
 # ===== GEMINI MODEL INITIALIZATION =====
 # Using Google Gemini for Search Agents
 from google.adk.models.google_llm import Gemini
-Model="gemini-2.0-flash-lite"
+Model="gemini-2.0-flash"
 def get_gemini_model():
     """Returns a configured Gemini model instance."""
-    model = Gemini(model=Model)
-    logger.info(f"✅ Model initialized: {Model}")
+    # Ensure Google API Key is available
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        logger.warning("⚠️ GOOGLE_API_KEY not found in environment. Gemini may fail.")
+
+    model = Gemini(
+        model=Model,
+        generate_content_config=types.GenerateContentConfig(
+            http_options=types.HttpOptions(
+                retry_options=types.HttpRetryOptions(initial_delay=10, attempts=10)
+            )
+        )
+    )
+    logger.info(f"✅ Model initialized: {Model} with Retry Options")
     return model
 
 
