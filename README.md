@@ -9,6 +9,10 @@ pinned: false
 
 # Package Conflict Identifier 📦🔍
 
+### Use "git" for accessing git and "origin" for accessing the hugging face spaces
+#### git push git main , git push origin main
+<br>
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Google ADK](https://img.shields.io/badge/Google-ADK-4285F4.svg)](https://github.com/google/adk)
