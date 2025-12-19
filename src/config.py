@@ -37,7 +37,7 @@ def get_model():
 # ===== GEMINI MODEL INITIALIZATION =====
 # Using Google Gemini for Search Agents
 from google.adk.models.google_llm import Gemini
-Model="gemini-2.0-flash-lite"
+Model="gemini-2.5-flash"
 def get_gemini_model():
     """Returns a configured Gemini model instance."""
     model = Gemini(model=Model)
