@@ -1,0 +1,529 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: yashwant00cr7/ai-powered-package-conflict-resolver
+    source: https://github.com/yashwant00cr7/ai-powered-package-conflict-resolver
+    branch: main
+    commit: "87b65d5c"
+    scope: [main.py, src/agents.py, src/app.py, src/combined_server.py, src/config.py, src/memory.py, src/tools.py, src/utils.py,
+      web_app.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T17:00:28Z'
+    url: https://a2as.org/certified/agents/yashwant00cr7/ai-powered-package-conflict-resolver
+  signatures:
+    digest: sha256:XWy7e-Lxt-Aq_7R_oxYx22ACewzLr2DL5g_fBdvx1Pw
+    key: ed25519:b9X1plAv_qB7q3voBspMGCP0E1c6_aMEkqwkhvZW0lI
+    sig: ed25519:rwqViBzzmm1Bzg0DseirBuNt-74y3DYEVBxoZZGmkwSC1L2hDiLZSQdIa1IkwBt2kAQVa1xjfKV7xXbLZydnDA
+
+agents:
+  agent:
+    type: instance
+    models: [model]
+    tools: [tools]
+    params:
+      class: WebCrawlAgent
+      base: Agent
+  code_surgeon:
+    type: instance
+    models: [get_model]
+    tools: [retrieve_context_tool, save_context_tool]
+    params:
+      name: Code_Surgeon_Agent
+      description: Expert Software Developer specialized in dependency resolution
+      instruction: [You are the "Code Surgeon"., 'YOUR TASK:', 1. Use 'retrieve_context' to get the 'packages' and 'versions'
+          stored by the Query Creator., 2. Analyze the dependency conflicts provided by the user., '3. Based on the research
+          findings from the Web Crawl Agent, determine the correct versions.', '4. Generate a clean dependency configuration
+          file (e.g., requirements.txt, package.json, pom.xml) with resolved dependencies.', 4. Provide an explanation of
+          what was fixed and why., 'OUTPUT FORMAT:', '- Clear explanation of the issue', '- Updated dependency file content',
+        '- Migration notes (if breaking changes exist)', 'IMPORTANT:', '- Call `save_context(''solution'', ''YOUR_SOLUTION_SUMMARY'')`
+          to store the final resolution.', '- Call `save_context(''requirements'', ''YOUR_REQUIREMENTS_CONTENT'')` to store
+          the file content.']
+      function: create_code_surgeon_agent
+  community_search:
+    type: instance
+    models: [get_gemini_model]
+    tools: [google_search]
+    params:
+      name: Community_Search_Agent
+      description: Search agent focused on community discussions
+      instruction: [You are the "Community Researcher"., 'YOUR GOAL:', 'Search for community discussions, bug reports, and
+          stackoverflow threads.', 'Focus on sites like stackoverflow.com, github.com/issues, reddit.com.', 'INPUT: List of
+          search queries.', 'OUTPUT: Top 4 most relevant COMMUNITY URLs.', 'OUTPUT FORMAT:', 'Return ONLY a raw JSON list
+          of URLs. Do not include any markdown formatting, headings, or conversational text.', 'Example: ["https://stackoverflow.com/questions/12345",
+          "https://github.com/issues/6789"]']
+      function: create_community_search_agent
+  context_search:
+    type: instance
+    models: [get_gemini_model]
+    tools: [google_search]
+    params:
+      name: Context_Search_Agent
+      description: Search agent focused on general context and main URL
+      instruction: [You are the "Context Researcher"., 'YOUR GOAL:', '1. Analyze the input search queries to identify the
+          "Main Topic" or "Core Library/Framework" (e.g., if input is "numpy float error", main topic is "numpy").', '2. Search
+          for the Home Page, Main Documentation Hub, or Wikipedia page for this Main Topic.', 3. Provide the top 3-4 most
+          authoritative URLs for this topic., 'INPUT: List of search queries.', 'OUTPUT: Top 3-4 most relevant URLs.', 'OUTPUT
+          FORMAT:', 'Return ONLY a raw JSON list of URLs. Do not include any markdown formatting, headings, or conversational
+          text.', 'Example: ["https://numpy.org", "https://pypi.org/project/numpy/"]']
+      function: create_context_search_agent
+  docs_search:
+    type: instance
+    models: [get_gemini_model]
+    tools: [google_search]
+    params:
+      name: Docs_Search_Agent
+      description: Search agent focused on official documentation
+      instruction: [You are the "Official Docs Researcher"., 'YOUR GOAL:', 'Search for official documentation, API references,
+          and migration guides.', 'Focus on domains like *.org, *.io, *.dev, and official GitHub repositories.', 'INPUT: List
+          of search queries.', 'OUTPUT: Top 4 most relevant OFFICIAL URLs.', 'OUTPUT FORMAT:', 'Return ONLY a raw JSON list
+          of URLs. Do not include any markdown formatting, headings, or conversational text.', 'Example: ["https://docs.python.org/3/",
+          "https://pypi.org/project/requests/"]']
+      function: create_docs_search_agent
+  parallel_search:
+    type: instance
+    params:
+      name: Parallel_Search_Team
+      description: Sequential search for official, community, and general context resources
+      function: create_root_agent
+      sub_agents: [docs_search, community_search, context_search]
+  query_creator:
+    type: instance
+    models: [get_gemini_model]
+    tools: [save_context_tool, retrieve_memory_tool]
+    params:
+      name: Query_Creator_Agent
+      description: Dependency Detective specialized in diagnosing Python environment conflicts
+      instruction: ['You are the "Dependency Detective," an expert AI agent specialized in diagnosing software environment
+          conflicts, legacy code rot, and version mismatch errors.', Use Google Search Tool if You don't Know about those
+          issue or packages., Use `retrieve_memory` to recall details from previous conversations if the user refers to "last
+          time" or "previous error"., 'YOUR GOAL:', '1. Analyze the input to identify the specific packages involved (e.g.,
+          "tensorflow", "react", "spring-boot").', '2. Save these package names to the session state using `save_context(''packages'',
+          ''package1, package2'')`.', '3. Generate a list of targeted, technical search queries that will help a downstream
+          "Web Crawler" find the exact solution.', 'INPUT YOU WILL RECEIVE:', '1. A list of packages (e.g., "tensorflow, keras"
+          or "react, next.js").', 2. An error log or description., 'YOUR ANALYSIS PROCESS:', 1. Extract the package names
+          and versions from the input., '2. Call `save_context(''packages'', ''extracted_package_list'')`.', '3. Analyze the
+          Error: Is it a syntax error or a compatibility error? Look for keywords like "deprecated", "mismatch", "attribute
+          error".', '4. Analyze the Stack: Look at the libraries involved.', '5. Hypothesize Conflicts: Generate search queries
+          that target:', '- "Breaking changes" in the libraries mentioned.', '- "Migration guides" for the specific error.',
+        '- "Compatibility matrices" for the package combinations.', 'OUTPUT FORMAT:', 'Start your response with:', '**Model:
+          Gemini 2.0 Flash Lite**', '## Search Queries', Return a raw JSON list of strings in your text response., 'Example:
+          ["numpy.float deprecated version", "react hook dependency warning"]']
+      function: create_query_creator_agent
+  root_agent:
+    type: instance
+    params:
+      name: Package_Conflict_Resolver_Root_Agent
+      description: Root agent managing the dependency resolution pipeline
+      after_agent_callback: auto_save_to_memory
+      function: create_root_agent
+      sub_agents: [web_research_team, web_crawl, code_surgeon]
+  web_crawl:
+    type: instance
+    models: [get_model]
+    tools: [batch_tool, adaptive_tool]
+    params:
+      name: Web_Crawl_Agent
+      description: Technical Content Extractor using Deterministic Logic
+      instruction: [You are the "Technical Content Extractor"., '(Note: This instruction is less critical now as the custom
+          run method handles the logic,', but kept for metadata purposes).]
+      function: create_web_crawl_agent
+  web_research_team:
+    type: instance
+    params:
+      name: Web_Research_Team
+      description: Team responsible for researching dependency issues
+      function: create_root_agent
+      sub_agents: [query_creator, parallel_search]
+
+models:
+  get_gemini_model:
+    type: function
+    agents: [query_creator, docs_search, community_search, context_search]
+    params:
+      wrapper: get_gemini_model
+  get_model:
+    type: function
+    agents: [web_crawl, code_surgeon]
+    params:
+      wrapper: get_model
+  model:
+    type: literal
+    agents: [agent]
+
+tools:
+  adaptive_tool:
+    type: function
+    agents: [web_crawl]
+  batch_tool:
+    type: function
+    agents: [web_crawl]
+  google_search:
+    type: module
+    agents: [docs_search, community_search, context_search]
+  retrieve_context_tool:
+    type: function
+    agents: [code_surgeon]
+  retrieve_memory_tool:
+    type: function
+    agents: [query_creator]
+  save_context_tool:
+    type: function
+    agents: [query_creator, code_surgeon]
+  tools:
+    type: function
+    agents: [agent]
+    params:
+      dynamic: "True"
+
+teams:
+  agent:
+    type: sequential
+    agents: [agent, web_research_team, web_crawl, code_surgeon]
+  parallel_search:
+    type: sequential
+    agents: [parallel_search, docs_search, community_search, context_search]
+  web_research_team:
+    type: sequential
+    agents: [web_research_team, query_creator, parallel_search]
+
+imports:
+  adaptive_tool: tools.adaptive_tool
+  AdaptiveConfig: crawl4ai.AdaptiveConfig
+  AdaptiveCrawler: crawl4ai.AdaptiveCrawler
+  AdkWebServer: google.adk.cli.adk_web_server.AdkWebServer
+  Agent: google.adk.Agent
+  Any: typing.Any
+  App: google.adk.App
+  AsyncGenerator: typing.AsyncGenerator
+  asyncio: asyncio
+  AsyncWebCrawler: crawl4ai.AsyncWebCrawler
+  BaseAgentLoader: google.adk.cli.adk_web_server.BaseAgentLoader
+  BaseCredentialService: google.adk.cli.adk_web_server.BaseCredentialService
+  BaseMemoryService: google.adk.memory.base_memory_service.BaseMemoryService
+  BaseModel: pydantic.BaseModel
+  batch_tool: tools.batch_tool
+  BrowserConfig: crawl4ai.BrowserConfig
+  CacheMode: crawl4ai.CacheMode
+  certifi: certifi
+  cli: google.adk.cli
+  CrawlerRunConfig: crawl4ai.CrawlerRunConfig
+  create_root_agent: src.agents.create_root_agent
+  DatabaseSessionService: google.adk.sessions.DatabaseSessionService
+  datetime: datetime.datetime
+  Dict: typing.Dict
+  EmbeddedResource: mcp.types.EmbeddedResource
+  EvalSetResultsManager: google.adk.cli.adk_web_server.EvalSetResultsManager
+  EvalSetsManager: google.adk.cli.adk_web_server.EvalSetsManager
+  EventsCompactionConfig: google.adk.types.EventsCompactionConfig
+  EventSourceResponse: sse_starlette.sse.EventSourceResponse
+  FastAPI: fastapi.FastAPI
+  Field: pydantic.Field
+  FileArtifactService: google.adk.artifacts.FileArtifactService
+  FileResponse: fastapi.responses.FileResponse
+  FunctionTool: google.adk.tools.FunctionTool
+  futures: concurrent.futures
+  Gemini: google.adk.models.google_llm.Gemini
+  genai_types: google.genai.types
+  get_gemini_model: config.get_gemini_model
+  get_memory_service: src.config.get_memory_service
+  get_model: config.get_model
+  get_session_service: src.config.get_session_service
+  google_search: google.adk.tools.google_search
+  ImageContent: mcp.types.ImageContent
+  InMemoryMemoryService: google.adk.memory.InMemoryMemoryService
+  json: json
+  LazyDatabaseSessionService: lazy_session.LazyDatabaseSessionService
+  List: typing.List
+  LiteLlm: google.adk.models.lite_llm.LiteLlm
+  LLMConfig: crawl4ai.LLMConfig
+  LLMExtractionStrategy: crawl4ai.extraction_strategy.LLMExtractionStrategy
+  load_dotenv: dotenv.load_dotenv
+  load_memory: google.adk.tools.load_memory
+  LocalEvalSetResultsManager: google.adk.evaluation.local_eval_set_results_manager.LocalEvalSetResultsManager
+  LocalEvalSetsManager: google.adk.evaluation.local_eval_sets_manager.LocalEvalSetsManager
+  logger: src.utils.logger
+  logging: logging
+  MemoryEntry: google.adk.memory.memory_entry.MemoryEntry
+  nest_asyncio: nest_asyncio
+  Optional: typing.Optional
+  os: os
+  Path: pathlib.Path
+  Pinecone: pinecone.Pinecone
+  PineconeMemoryService: memory.PineconeMemoryService
+  PlainTextResponse: fastapi.responses.PlainTextResponse
+  re: re
+  RedirectResponse: fastapi.responses.RedirectResponse
+  Request: fastapi.Request
+  retrieve_context_tool: tools.retrieve_context_tool
+  retrieve_memory_tool: tools.retrieve_memory_tool
+  root_agent: agents.root_agent
+  Runner: google.adk.Runner
+  save_context_tool: tools.save_context_tool
+  SearchMemoryResponse: google.adk.memory.base_memory_service.SearchMemoryResponse
+  SentenceTransformer: sentence_transformers.SentenceTransformer
+  SequentialAgent: google.adk.agents.SequentialAgent
+  Server: mcp.server.Server
+  ServerlessSpec: pinecone.ServerlessSpec
+  Session: google.adk.sessions.Session
+  SseServerTransport: mcp.server.sse.SseServerTransport
+  submit_queries_tool: tools.submit_queries_tool
+  sys: sys
+  TextContent: mcp.types.TextContent
+  Tool: mcp.types.Tool
+  ToolContext: google.adk.tools.ToolContext
+  types: mcp.types
+  uuid: uuid
+  uvicorn: uvicorn
+  validate_tool: tools.validate_tool
+
+functions:
+  __init__:
+    type: sync
+    module: src.combined_server
+    args: [self, base_dir]
+  adaptive_crawl_tool:
+    type: async
+    module: src.tools
+    args: [start_url, user_query]
+    params:
+      returns: Dict
+  add_message:
+    type: async
+    module: src.lazy_session
+    args: [self, session_id, message]
+    params:
+      returns: None
+  add_session_to_memory:
+    type: async
+    module: src.memory
+    args: [self, session]
+  append_event:
+    type: async
+    module: src.lazy_session
+    args: [self, session, event]
+    params:
+      returns: None
+  auto_save_to_memory:
+    type: async
+    module: src.agents
+    args: [callback_context]
+  batch_crawl_tool:
+    type: async
+    module: src.tools
+    args: [urls]
+    params:
+      returns: Dict
+  create_code_surgeon_agent:
+    type: sync
+    module: src.agents
+  create_community_search_agent:
+    type: sync
+    module: src.agents
+  create_context_search_agent:
+    type: sync
+    module: src.agents
+  create_docs_search_agent:
+    type: sync
+    module: src.agents
+  create_query_creator_agent:
+    type: sync
+    module: src.agents
+  create_root_agent:
+    type: sync
+    module: src.agents
+  create_session:
+    type: async
+    module: src.lazy_session
+    args: [self, session_id, user_id, app_name]
+    params:
+      returns: Session
+  create_web_crawl_agent:
+    type: sync
+    module: src.agents
+  get_agent_builder:
+    type: async
+    module: src.combined_server
+    args: [app_name, file_path, tmp]
+  get_gemini_model:
+    type: sync
+    module: src.config
+  get_memory_service:
+    type: sync
+    module: src.config
+  get_model:
+    type: sync
+    module: src.config
+  get_session:
+    type: async
+    module: src.lazy_session
+    args: [self, session_id]
+    params:
+      returns: Optional[Session]
+  get_session_service:
+    type: sync
+    module: src.config
+    args: [db_url]
+  handle_call_tool:
+    type: tool
+    module: src.combined_server
+    args: [name, arguments]
+    params:
+      returns: list
+  handle_list_tools:
+    type: tool
+    module: src.combined_server
+    params:
+      returns: list[types.Tool]
+  handle_messages:
+    type: async
+    module: src.combined_server
+    args: [request]
+  handle_sse:
+    type: async
+    module: src.combined_server
+    args: [request]
+  list_agents:
+    type: sync
+    module: src.combined_server
+    args: [self]
+    params:
+      returns: list[str]
+  list_sessions:
+    type: async
+    module: src.lazy_session
+    args: [self, app_name]
+    params:
+      returns: List[Session]
+  load_agent:
+    type: sync
+    module: src.combined_server
+    args: [self, agent_name]
+  load_credential:
+    type: sync
+    module: src.combined_server
+    args: [self, auth_config, callback_context]
+    params:
+      returns: Optional[Any]
+  main:
+    type: async
+    module: main
+  retrieve_context:
+    type: sync
+    module: src.tools
+    args: [tool_context, key]
+    params:
+      returns: str
+  retrieve_memory:
+    type: async
+    module: src.tools
+    args: [query]
+    params:
+      returns: str
+  root:
+    type: async
+    module: src.combined_server
+  run:
+    type: async
+    module: src.agents
+    args: [self, input_str]
+  run_session:
+    type: async
+    module: main
+    args: [runner, user_input, session_id]
+  save_context:
+    type: sync
+    module: src.tools
+    args: [tool_context, key, value]
+    params:
+      returns: str
+  save_credential:
+    type: sync
+    module: src.combined_server
+    args: [self, auth_config, callback_context]
+    params:
+      returns: None
+  search_memory:
+    type: async
+    module: src.memory
+    args: [self, query, limit]
+    params:
+      returns: List[str]
+  setup_logging:
+    type: sync
+    module: src.utils
+    args: [level]
+  sse_asgi_app:
+    type: async
+    module: src.combined_server
+    args: [scope, receive, send]
+  submit_queries:
+    type: sync
+    module: src.tools
+    args: [tool_context, queries]
+    params:
+      returns: str
+  validate_requirements:
+    type: sync
+    module: src.tools
+    args: [tool_context, requirements_content]
+    params:
+      returns: str
+
+variables:
+  DATABASE_URL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [src.config]
+  GOOGLE_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [src.config]
+  OPENAI_API_BASE:
+    type: env
+    params:
+      caller: [os.environ]
+  OPENAI_API_KEY:
+    type: env
+    params:
+      caller: [os.environ]
+  OPENROUTER_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [src.config]
+  PINECONE_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [src.config]
+  SSL_CERT_FILE:
+    type: env
+    params:
+      caller: [os.environ]
+
+files:
+  "..":
+    type: pattern
+    actions: [read]
+    params:
+      caller: [os.path.join]
+      pattern: [os.path.dirname(), ".."]
+  agents_path:
+    type: literal
+    actions: [read]
+    params:
+      caller: [Path(os.path.abspath(src))]
+  base_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
+  data_dir:
+    type: variable
+    actions: [read]
+    params:
+      caller: [os.makedirs]
