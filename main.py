@@ -103,10 +103,10 @@ async def main():
     
     # Explicitly create the session first to avoid "Session not found" error
     # Delete existing DB to ensure clean state
-    if os.path.exists("package_conflict_resolver.db"):
+    if os.path.exists("legacy_solver.db"):
         try:
-            os.remove("package_conflict_resolver.db")
-            logger.info("🗑️  Removed existing database file")
+            os.remove("legacy_solver.db")
+            logger.info("🗑️  Removed existing database file (legacy_solver.db)")
         except Exception as e:
             logger.warning(f"⚠️  Could not remove DB: {e}")
 

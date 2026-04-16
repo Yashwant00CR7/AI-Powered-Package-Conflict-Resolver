@@ -4,6 +4,7 @@ from google.adk.sessions import DatabaseSessionService, Session
 from google.genai import types
 import uuid
 from .utils import logger
+from google.api_core.exceptions import AlreadyExists as AlreadyExistsError
 
 class LazyDatabaseSessionService(DatabaseSessionService):
     """
@@ -74,13 +75,16 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             meta = self._pending_sessions.pop(session_id)
             
             # Persist the session now!
-            await super().create_session(
-                session_id=session_id,
-                user_id=meta["user_id"],
-                app_name=meta["app_name"],
-                **meta["kwargs"]
-            )
-            logger.info(f"💾 Session {session_id} persisted to DB.")
+            try:
+                await super().create_session(
+                    session_id=session_id,
+                    user_id=meta["user_id"],
+                    app_name=meta["app_name"],
+                    **meta["kwargs"]
+                )
+                logger.info(f"💾 Session {session_id} persisted to DB.")
+            except AlreadyExistsError:
+                logger.info(f"🤝 Session {session_id} already exists in DB, skipping creation.")
             
         # 2. Add the message (Super)
         await super().add_message(session_id=session_id, message=message)
@@ -98,13 +102,22 @@ class LazyDatabaseSessionService(DatabaseSessionService):
             meta = self._pending_sessions.pop(session_id)
             
             # Persist the session now!
-            persisted_session = await super().create_session(
-                session_id=session_id,
-                user_id=meta["user_id"],
-                app_name=meta["app_name"],
-                **meta["kwargs"]
-            )
-            logger.info(f"💾 Session {session_id} persisted to DB.")
+            try:
+                persisted_session = await super().create_session(
+                    session_id=session_id,
+                    user_id=meta["user_id"],
+                    app_name=meta["app_name"],
+                    **meta["kwargs"]
+                )
+                logger.info(f"💾 Session {session_id} persisted to DB.")
+            except AlreadyExistsError:
+                logger.info(f"🤝 Session {session_id} already exists in DB, fetching existing session.")
+                # If it already exists, fetch it to get correct state (timestamps)
+                persisted_session = await super().get_session(
+                    session_id=session_id,
+                    app_name=meta["app_name"],
+                    user_id=meta["user_id"]
+                )
             
             # FIX: Update the passed session object with the fresh timestamp from the DB
             # This prevents "stale session" errors in append_event

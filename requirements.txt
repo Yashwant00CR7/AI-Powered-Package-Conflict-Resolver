@@ -8,6 +8,8 @@ certifi
 litellm
 pinecone
 sentence-transformers
+fastapi
+pydantic
 uvicorn
-mcp
 sse-starlette
+mcp

@@ -67,12 +67,5 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Development/Debug files
-verify_*.py
-debug_*.py
-inspect_*.py
-test_*.py
-PROJECT_RENAME_SUMMARY.md
-
 # Old database files
 legacy_solver.db

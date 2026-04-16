@@ -59,7 +59,7 @@ def create_query_creator_agent():
 
         OUTPUT FORMAT:
         Start your response with:
-        **Model: Gemini 2.0 Flash Lite**
+        **Model: Gemini 2.5 Flash**
         ## Search Queries
         
         Return a raw JSON list of strings in your text response.
