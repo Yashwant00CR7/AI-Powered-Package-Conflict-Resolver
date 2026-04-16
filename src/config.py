@@ -155,9 +155,9 @@ def get_model():
     
     # List of high-performance free models for rotation
     primary_models = [
-        """Working Model with tool calling support and no rate limiting"""
-        "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
-        #Not Working
+        #Working Model with tool calling support and no rate limiting
+        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+        # Not Working
         # "openrouter/google/gemma-4-26b-a4b-it:free",
         # "openrouter/google/gemma-3-27b-it:free",
         # "openrouter/meta-llama/llama-3.3-70b-instruct:free",

@@ -67,5 +67,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
+doc/
+scratch/
+
 # Old database files
 legacy_solver.db
