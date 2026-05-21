@@ -1,17 +1,4 @@
----
-title: Package Conflict Identifier
-emoji: 📦
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-pinned: false
----
-
 # Package Conflict Identifier 📦🔍
-
-### Use "git" for accessing git and "origin" for accessing the hugging face spaces
-#### git push git main , git push origin main
-<br>
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -19,11 +6,11 @@ pinned: false
 [![MCP Ready](https://img.shields.io/badge/MCP-Ready-green.svg)](https://modelcontextprotocol.io/)
 [![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/Yash030/AI-Package-Doctor)
 
-> **AI-powered package conflict identifier and resolver** using Google's Agent Development Kit (ADK). It leverages a multi-agent architecture with Google Gemini and OpenRouter (Grok) models to diagnose dependency issues, research solutions, and generate fixed configuration files.
+> AI-powered package conflict identifier and resolver using Google's Agent Development Kit (ADK). A multi-agent architecture with Gemini and Grok models that diagnoses dependency issues, researches solutions, and generates fixed configuration files.
 
 <div align="center">
 
-## 🚀 **Try it Live!**
+## 🚀 Try it Live
 
 | **Web UI** | **MCP Server Endpoint** |
 | :---: | :---: |
@@ -35,73 +22,42 @@ pinned: false
 
 ## 🎯 Features
 
-- **🤖 Advanced Multi-Agent Architecture**:
-  - **Context Search Agent**: Retrieves insights from past sessions using Pinecone vector memory.
-  - **Parallel Research Team**: Concurrent searching of Official Docs and Community forums.
-  - **Web Crawl Agent**: Uses **Firecrawl** (via OpenRouter) for deep web scraping of documentation.
-  - **Code Surgeon**: Generates and validates `requirements.txt` fixes.
+- **Multi-Agent Architecture**:
+  - **Context Search Agent**: Retrieves insights from past sessions via Pinecone vector memory
+  - **Parallel Research Team**: Concurrent search of official docs and community forums
+  - **Web Crawl Agent**: Deep scraping via Firecrawl (OpenRouter)
+  - **Code Surgeon**: Generates and validates `requirements.txt` fixes
 
-- **🧠 Hybrid Model Intelligence**:
-  - **Google Gemini 2.0 Flash Lite**: For high-speed reasoning and orchestration.
-  - **Grok 4.1 Fast (via OpenRouter)**: For specialized web crawling and context analysis.
+- **Hybrid Model Intelligence**:
+  - **Google Gemini 2.0 Flash Lite**: High-speed reasoning and orchestration
+  - **Grok via OpenRouter**: Specialized web crawling and context analysis
 
-- **🔌 Model Context Protocol (MCP) Server**:
-  - Exposes the agent's capabilities as a standard MCP tool (`solve_dependency_issue`).
-  - Connects seamlessly to MCP clients like Claude Desktop or other AI assistants.
+- **MCP Server**: Exposes `solve_dependency_issue` as a standard MCP tool — connect from Claude Desktop or any MCP client
 
-- **💾 Persistent Memory**:
-  - **Short-Term**: SQLite/PostgreSQL session storage.
-  - **Long-Term**: Pinecone Vector Database for recalling past solutions.
+- **Persistent Memory**:
+  - Short-term: SQLite/PostgreSQL session storage
+  - Long-term: Pinecone vector DB for recalling past solutions
 
-- **🛠️ Intelligent Tooling**:
-  - `retrieve_memory`: Semantic search of previous conversations.
-  - `google_search`: Live web search.
-  - `firecrawl`: Advanced web scraping.
-
-## 📁 Project Structure
-
-```
-package_conflict_resolver/
-├── .env                  # Environment variables (API Keys)
-├── requirements.txt      # Dependencies
-├── main.py               # CLI Entry Point
-├── src/
-│   ├── combined_server.py # Combined ADK Web UI + MCP Server
-│   ├── config.py         # Configuration & Service Initialization
-│   ├── tools.py          # Custom Tools (Search, Memory, Validation)
-│   ├── agents.py         # Agent Definitions & Workflow
-│   └── utils.py          # Logging & Helpers
-└── ...
-├── src/
-│   ├── combined_server.py # Combined ADK Web UI + MCP Server
-│   ├── config.py         # Configuration & Service Initialization
-│   ├── tools.py          # Custom Tools (Search, Memory, Validation)
-│   ├── agents.py         # Agent Definitions & Workflow
-│   └── utils.py          # Logging & Helpers
-└── ...
-```
+---
 
 ## 🏗️ Architecture
 
 <div align="center">
   <img src="https://github.com/user-attachments/assets/ee299a66-8601-494a-a2ba-d102b036dff2" alt="Architecture Diagram" width="800"/>
-  <br>
-  <em>High-level architecture of the Package Conflict Identifier Agent</em>
 </div>
 
-<br>
+---
 
 ## 🚀 Quick Start
 
 ### 1. Clone & Install
 ```bash
-git clone <your-repo-url>
-cd package_conflict_resolver
+git clone https://github.com/Yashwant00CR7/AI-Powered-Package-Conflict-Resolver.git
+cd AI-Powered-Package-Conflict-Resolver
 pip install -r requirements.txt
 ```
 
 ### 2. Configure Environment
-Create a `.env` file with your API keys:
 ```env
 GOOGLE_API_KEY=your_gemini_key
 OPENROUTER_API_KEY=your_openrouter_key
@@ -109,45 +65,30 @@ PINECONE_API_KEY=your_pinecone_key
 DATABASE_URL=sqlite+aiosqlite:///legacy_solver.db
 ```
 
-### 3. Run the Agent
+### 3. Run
 
-**Option A: Combined Server (Web UI + MCP) - Recommended**
-This runs both the ADK Developer UI and the MCP Server on the same port.
+**Combined Server (Web UI + MCP) — recommended:**
 ```bash
 python -m src.combined_server
 ```
-- **Web UI**: [http://localhost:7860/dev-ui/](http://localhost:7860/dev-ui/)
-- **MCP SSE Endpoint**: [http://localhost:7860/mcp/sse](http://localhost:7860/mcp/sse)
+- Web UI: http://localhost:7860/dev-ui/
+- MCP SSE: http://localhost:7860/mcp/sse
 
-**Option B: CLI Mode**
-**Option A: Combined Server (Web UI + MCP) - Recommended**
-This runs both the ADK Developer UI and the MCP Server on the same port.
-```bash
-python -m src.combined_server
-```
-- **Web UI**: [http://localhost:7860/dev-ui/](http://localhost:7860/dev-ui/)
-- **MCP SSE Endpoint**: [http://localhost:7860/mcp/sse](http://localhost:7860/mcp/sse)
-
-**Option B: CLI Mode**
+**CLI mode:**
 ```bash
 python main.py
 ```
 
-## 🔌 MCP Server Integration
+---
 
-This agent is deployed as an MCP server, allowing you to use its dependency solving capabilities directly from other AI tools.
+## 🔌 MCP Integration
 
-### Public Endpoint (Hugging Face Spaces)
-- **SSE URL**: `https://yash030-ai-package-doctor.hf.space/mcp/sse`
-
-### Usage with Claude Desktop
-Add the following to your `claude_desktop_config.json`:
+Connect from Claude Desktop by adding to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "AI Package Doctor": {
-      "command": "",
       "url": "https://yash030-ai-package-doctor.hf.space/mcp/sse",
       "transport": "sse"
     }
@@ -155,92 +96,49 @@ Add the following to your `claude_desktop_config.json`:
 }
 ```
 
-Once connected, you can ask Claude:
-> "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
+Then ask Claude: *"I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you fix it?"*
 
-Claude will use the `solve_dependency_issue` tool to analyze the problem using the full power of the agentic workflow.
-## 🔌 MCP Server Integration
-
-This agent is deployed as an MCP server, allowing you to use its dependency solving capabilities directly from other AI tools.
-
-### Public Endpoint (Hugging Face Spaces)
-- **SSE URL**: `https://yash030-ai-package-doctor.hf.space/mcp/sse`
-
-### Usage with Claude Desktop
-Add the following to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "AI Package Doctor": {
-      "command": "",
-      "url": "https://yash030-ai-package-doctor.hf.space/mcp/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-Once connected, you can ask Claude:
-> "I have a conflict between numpy 1.26.4 and tensorflow 2.10.0. Can you help me fix it?"
-
-Claude will use the `solve_dependency_issue` tool to analyze the problem using the full power of the agentic workflow.
+---
 
 ## 🤖 Agent Workflow
 
-1.  **Query Creator Agent**:
-    - Analyzes the user's error message.
-    - Uses `retrieve_memory` to check if this issue was solved before.
-    - Generates search queries for the research team.
+1. **Query Creator** — analyzes error, checks memory for past solutions, generates search queries
+2. **Context Search Agent** — semantic search over long-term Pinecone memory
+3. **Parallel Research Team** — docs search + community search + Firecrawl deep crawl
+4. **Code Surgeon** — synthesizes findings, outputs corrected `requirements.txt`
 
-2.  **Context Search Agent**:
-    - Specifically looks for relevant context in the project's long-term memory.
+---
 
-3.  **Parallel Research Team**:
-    - **Docs Search Agent**: Searches official documentation.
-    - **Community Search Agent**: Searches StackOverflow/GitHub.
-    - **Web Crawl Agent**: Deep crawls specific documentation pages using Firecrawl.
+## 📁 Project Structure
 
-4.  **Code Surgeon**:
-    - Synthesizes all gathered information.
-    - Generates a corrected `requirements.txt` or solution plan.
+```
+package_conflict_resolver/
+├── main.py               # CLI entry point
+├── src/
+│   ├── combined_server.py # Web UI + MCP server
+│   ├── config.py          # Service initialization
+│   ├── tools.py           # Search, memory, validation tools
+│   ├── agents.py          # Agent definitions
+│   └── utils.py           # Logging & helpers
+├── requirements.txt
+└── Dockerfile
+```
 
-## ☁️ Deployment & Persistence
+---
 
-### Hugging Face Spaces
-The project is configured to run on Hugging Face Spaces (Docker SDK).
-- **Dockerfile**: Included in the root.
-- **Port**: Exposes port `7860`.
-- **Storage**: Uses `/data` directory for persistent storage (if configured with persistent volume).
+## ☁️ Deployment
 
-### Hugging Face Spaces
-The project is configured to run on Hugging Face Spaces (Docker SDK).
-- **Dockerfile**: Included in the root.
-- **Port**: Exposes port `7860`.
-- **Storage**: Uses `/data` directory for persistent storage (if configured with persistent volume).
-
-### Database
-For production (e.g., Hugging Face Spaces), use a PostgreSQL database:
+Runs on Hugging Face Spaces (Docker SDK) on port `7860`. For production, use PostgreSQL:
 ```env
 DATABASE_URL=postgresql+asyncpg://user:password@host/dbname
 ```
 
-### Long-Term Memory (Pinecone)
-To enable persistent memory across restarts:
-1.  Get a free API key from [Pinecone.io](https://www.pinecone.io).
-2.  Set `PINECONE_API_KEY` in `.env`.
-3.  The agent will automatically index and retrieve past sessions.
+---
 
 ## 📝 License
 
-MIT License.
+MIT License
 
-## 🙏 Credits
+## 🙏 Built With
 
-Built with:
-- [Google Agent Development Kit (ADK)](https://github.com/google/adk)
-- [Google Gemini](https://deepmind.google/technologies/gemini/)
-- [OpenRouter](https://openrouter.ai/)
-- [Pinecone](https://www.pinecone.io/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
+[Google ADK](https://github.com/google/adk) · [Gemini](https://deepmind.google/technologies/gemini/) · [OpenRouter](https://openrouter.ai/) · [Pinecone](https://www.pinecone.io/) · [Model Context Protocol](https://modelcontextprotocol.io/)
